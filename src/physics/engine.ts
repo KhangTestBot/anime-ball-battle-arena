@@ -1304,10 +1304,13 @@ export class BattleEngine implements AbilityContext {
           const dy = ore.y - f.y;
           const dist = Math.hypot(dx, dy);
           if (dist > 1) {
-            const targetSpd = Math.max(260, Math.hypot(f.vx, f.vy));
-            const desiredVx = (dx / dist) * targetSpd;
-            const desiredVy = (dy / dist) * targetSpd;
-            const blend = Math.min(1, dt * 4.5);
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const targetSpd = Math.max(255, Math.hypot(f.vx, f.vy));
+            const desiredVx = nx * targetSpd;
+            const desiredVy = ny * targetSpd;
+            // Smoothly steer toward the ore while damping tangential orbit velocity
+            const blend = Math.min(1, dt * (dist < 130 ? 6.5 : 3.6));
             f.vx += (desiredVx - f.vx) * blend;
             f.vy += (desiredVy - f.vy) * blend;
           }
@@ -1578,8 +1581,11 @@ export class BattleEngine implements AbilityContext {
         const maxY = Math.max(minY + 10, this.bounds.bottom - pad);
         let ox = minX + Math.random() * (maxX - minX);
         let oy = minY + Math.random() * (maxY - minY);
-        for (let tries = 0; tries < 6; tries++) {
-          if (Math.hypot(ox - f.x, oy - f.y) >= 115) break;
+        const enemies = this.getEnemies(f);
+        for (let tries = 0; tries < 18; tries++) {
+          const farFromSteve = Math.hypot(ox - f.x, oy - f.y) >= 185;
+          const clearOfEnemies = enemies.every((e) => Math.hypot(ox - e.x, oy - e.y) >= 105);
+          if (farFromSteve && clearOfEnemies) break;
           ox = minX + Math.random() * (maxX - minX);
           oy = minY + Math.random() * (maxY - minY);
         }
@@ -1591,10 +1597,10 @@ export class BattleEngine implements AbilityContext {
           kind,
           x: ox,
           y: oy,
-          w: 34,
-          h: 34,
-          hp: 1,
-          maxHp: 1,
+          w: 32,
+          h: 32,
+          hp: 2,
+          maxHp: 2,
           life: 30,
           maxLife: 30,
           blocksProjectiles: false,
@@ -1607,11 +1613,30 @@ export class BattleEngine implements AbilityContext {
     }
 
     const ore = this.obstacles[oreIdx];
-    const dist = Math.hypot(ore.x - f.x, ore.y - f.y);
-    if (dist <= f.radius + ore.w * 0.58) {
+    const dx = ore.x - f.x;
+    const dy = ore.y - f.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= f.radius + ore.w * 0.38) {
+      if (ore.hp > 1) {
+        // First pickaxe strike cracks the ore block and bounces Steve back for a second swing!
+        ore.hp -= 1;
+        const nx = dist > 0.01 ? dx / dist : 1;
+        const ny = dist > 0.01 ? dy / dist : 0;
+        const sep = f.radius + ore.w * 0.45 - dist;
+        if (sep > 0) {
+          f.x -= nx * sep;
+          f.y -= ny * sep;
+        }
+        f.vx = -nx * 190 + ny * 85;
+        f.vy = -ny * 190 - nx * 85;
+        this.spawnParticles(ore.x, ore.y, 7, '#a8a29e', 50, 150, 2, 4.5, 'pixel');
+        this.emitSfx({ type: 'wall', intensity: 0.75 });
+        return;
+      }
+
       this.obstacles.splice(oreIdx, 1);
       f.steveMinedOres += 1;
-      f.steveMineSpawnCd = 0.2;
+      f.steveMineSpawnCd = 0.65;
       this.spawnParticles(ore.x, ore.y, 14, ore.color, 70, 220, 3, 6, 'pixel');
       this.emitSfx({ type: 'wall', intensity: 1.1 });
 

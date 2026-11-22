@@ -75,7 +75,7 @@ describe('Steve Mining Progression & No Time-Based DMG% Scaling', () => {
     let reachedNetherite = false;
     let damagedBeforeNetherite = false;
 
-    for (let i = 0; i < 3600 && !reachedNetherite; i++) {
+    for (let i = 0; i < 7200 && !reachedNetherite; i++) {
       engine.step(1 / 60);
       if (steve.formIndex < 3 && steve.damageDealt > 0) {
         damagedBeforeNetherite = true;

@@ -114,7 +114,7 @@ export function createInitialLobbyState(muted: boolean, voiceMode: VoiceMode): L
     seriesFilter: 'all',
     searchQuery: '',
     baseHp: 1000,
-    simSpeed: 1,
+    simSpeed: 0.5,
     arenaSize: 'medium',
     arenaTheme: 'cyber-grid',
     suddenDeath: true,
