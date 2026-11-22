@@ -2,7 +2,7 @@ import { getCharacterById } from '../characters/roster';
 import type { BattleEngine } from '../physics/engine';
 import { drawArenaStageFloor, getArenaStageById } from './arenaStages';
 import { drawFighterBall, drawUltimateShowcaseCharacter, hexWithAlpha } from './characterDraw';
-import { drawDomainBackdrops, drawDomainBanners } from './domainDraw';
+import { drawDomainBackdrops } from './domainDraw';
 import {
   drawBeams,
   drawBombs,
@@ -21,7 +21,6 @@ import {
 import {
   drawArenaObstacles,
   drawCustomUltimateBackdrops,
-  drawCustomUltimateBanners,
   drawCustomUltimateForegrounds,
 } from './ultimates/registry';
 import { drawCastSeals } from './vfxIdentity';
@@ -151,10 +150,8 @@ export class ArenaRenderer {
       timeSec,
     );
 
-    // 11. Floating numbers & POWER UP banners + Active Domain/Ultimate Banners (clipped cleanly inside arena)
+    // 11. Floating numbers & POWER UP callouts (clipped cleanly inside arena)
     drawFloatingTexts(ctx, engine.floatingTexts);
-    drawDomainBanners(ctx, engine.domains, engine.bounds);
-    drawCustomUltimateBanners(ctx, engine.activeUltimates, engine.bounds, engine.domains.length);
 
     // 11b. Center-Screen Ultimate Cut-In Cinematic Highlight!
     if (engine.activeCutIn) {
