@@ -69,13 +69,13 @@ describe('Steve Mining Progression & No Time-Based DMG% Scaling', () => {
     expect(steve.formIndex).toBe(0);
     expect(steve.character.forms[0].name).toBe('Wood Gear');
 
-    // Step until Steve spawns & mines all 6 ores (2 Iron, 2 Diamond, 2 Ancient Debris)
+    // Step until Steve spawns & mines all 15 ores (5 Iron, 5 Diamond, 5 Ancient Debris)
     let reachedIron = false;
     let reachedDiamond = false;
     let reachedNetherite = false;
     let damagedBeforeNetherite = false;
 
-    for (let i = 0; i < 1800 && !reachedNetherite; i++) {
+    for (let i = 0; i < 3600 && !reachedNetherite; i++) {
       engine.step(1 / 60);
       if (steve.formIndex < 3 && steve.damageDealt > 0) {
         damagedBeforeNetherite = true;

@@ -1345,7 +1345,7 @@ export class BattleEngine implements AbilityContext {
     if (dist <= f.radius + ore.w * 0.58) {
       this.obstacles.splice(oreIdx, 1);
       f.steveMinedOres += 1;
-      f.steveMineSpawnCd = 0.35;
+      f.steveMineSpawnCd = 0.2;
       this.spawnParticles(ore.x, ore.y, 14, ore.color, 70, 220, 3, 6, 'pixel');
       this.emitSfx({ type: 'wall', intensity: 1.1 });
 
@@ -1356,11 +1356,11 @@ export class BattleEngine implements AbilityContext {
             ? 'DIAMOND ORE'
             : 'ANCIENT DEBRIS';
 
-      if (f.steveMinedOres < 2) {
+      if (f.steveMinedOres < 5) {
         this.spawnFloatingText(
           ore.x,
           ore.y - 16,
-          `MINED ${oreLabel} (${f.steveMinedOres}/2)`,
+          `MINED ${oreLabel} (${f.steveMinedOres}/5)`,
           ore.color,
           'callout',
         );
