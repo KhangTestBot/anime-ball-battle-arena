@@ -467,6 +467,7 @@ export class BattleEngine implements AbilityContext {
         target.mahoragaAdaptDmgAcc -= threshold;
         target.mahoragaAdaptStacks += 1;
         target.mahoragaWheelAngle += Math.PI / 4;
+        target.mahoragaWheelFlash = 0.78;
         const heal = Math.round(target.maxHp * 0.04 * getHealMultiplier(target));
         if (heal > 0) {
           target.hp = Math.min(target.maxHp, target.hp + heal);
@@ -478,17 +479,29 @@ export class BattleEngine implements AbilityContext {
             'heal',
           );
         }
+        // Iconic *KLINK!* Dharma Wheel turn VFX: twin golden-white shockwaves, star burst, micro-hitstop & chime!
         this.spawnShockwave(
           target.x,
           target.y,
-          target.radius + 54,
+          target.radius + 78,
           '#facc15',
-          4,
+          5.5,
           target.character.id,
           target.character.series,
         );
-        this.spawnParticles(target.x, target.y, 10, '#fef08a', 50, 170, 2.2, 4.8, 'star');
-        this.emitSfx({ type: 'dodge', intensity: 1.0 });
+        this.spawnShockwave(
+          target.x,
+          target.y,
+          target.radius + 42,
+          '#ffffff',
+          3.2,
+          target.character.id,
+          target.character.series,
+        );
+        this.spawnParticles(target.x, target.y, 18, '#fef08a', 65, 220, 2.5, 5.5, 'star');
+        this.addScreenShake(5.5);
+        this.addHitstop(0.028);
+        this.emitSfx({ type: 'powerup', intensity: 1.1 });
       }
     }
     const crowdHitScale = this.fighters.length >= 6 ? 0.58 : this.fighters.length >= 4 ? 0.78 : 1.0;
@@ -944,6 +957,7 @@ export class BattleEngine implements AbilityContext {
         mahoragaAdaptStacks: 0,
         mahoragaWheelAngle: 0,
         mahoragaAdaptDmgAcc: 0,
+        mahoragaWheelFlash: 0,
       };
     });
   }
@@ -1107,9 +1121,12 @@ export class BattleEngine implements AbilityContext {
         this.updateGojoPassiveAndBasic(f, dt);
       }
 
-      // Mahoraga Passive Dharma Wheel gentle rotation + faster stun recovery when adapted (4+ stacks)
+      // Mahoraga Passive Dharma Wheel gentle rotation + turn flash decay + faster stun recovery (4+ stacks)
       if (f.character.id === 'mahoraga') {
         f.mahoragaWheelAngle += dt * (0.45 + f.mahoragaAdaptStacks * 0.18);
+        if (f.mahoragaWheelFlash > 0) {
+          f.mahoragaWheelFlash = Math.max(0, f.mahoragaWheelFlash - dt);
+        }
         if (f.mahoragaAdaptStacks >= 4 && f.stunTimer > 0) {
           f.stunTimer = Math.max(0, f.stunTimer - dt);
         }

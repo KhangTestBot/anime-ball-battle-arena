@@ -207,16 +207,45 @@ export function drawFighterBall(
       ctx.restore();
     }
 
-    // Mahoraga Always-On Passive 8-Handled Golden Dharma Wheel (lights up per adaptation stack 0..8!)
+    // Mahoraga Always-On Passive 8-Handled Golden Dharma Wheel (lights up & flashes *KLINK!* on each turn 0..8!)
     if (f.alive && f.character.id === 'mahoraga') {
       const stacks = f.mahoragaAdaptStacks ?? 0;
-      const wheelR = r + 15;
+      const flash = Math.max(0, Math.min(1, (f.mahoragaWheelFlash ?? 0) / 0.78));
+      const wheelR = r + 15 + flash * 14;
       ctx.save();
       ctx.rotate(f.mahoragaWheelAngle ?? timeSec * 0.5);
-      ctx.strokeStyle = stacks >= 8 ? '#fef08a' : '#eab308';
+
+      // Expanding golden-white *KLINK!* flash ring & 8 radiant rays when wheel clicks a notch!
+      if (flash > 0.02) {
+        ctx.save();
+        ctx.globalAlpha = flash * 0.85;
+        ctx.strokeStyle = '#ffffff';
+        ctx.shadowColor = '#facc15';
+        ctx.shadowBlur = 24;
+        ctx.lineWidth = 3.5 * flash;
+        ctx.beginPath();
+        ctx.arc(0, 0, wheelR + (1 - flash) * 44, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 2.6 * flash;
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI * 2) / 8;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * wheelR, Math.sin(a) * wheelR);
+          ctx.lineTo(
+            Math.cos(a) * (wheelR + 22 + flash * 26),
+            Math.sin(a) * (wheelR + 22 + flash * 26),
+          );
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      ctx.strokeStyle = flash > 0.25 ? '#ffffff' : stacks >= 8 ? '#fef08a' : '#eab308';
       ctx.shadowColor = '#facc15';
-      ctx.shadowBlur = stacks > 0 ? 10 + stacks * 1.5 : 6;
-      ctx.lineWidth = 2.6;
+      ctx.shadowBlur = flash > 0.02 ? 26 : stacks > 0 ? 10 + stacks * 1.5 : 6;
+      ctx.lineWidth = 2.6 + flash * 2.2;
       ctx.beginPath();
       ctx.arc(0, 0, wheelR, 0, Math.PI * 2);
       ctx.stroke();
@@ -228,12 +257,13 @@ export function drawFighterBall(
         ctx.lineTo(Math.cos(a) * (wheelR + 6), Math.sin(a) * (wheelR + 6));
         ctx.stroke();
 
-        ctx.fillStyle = i < stacks ? '#fef08a' : 'rgba(202, 138, 4, 0.55)';
+        const isLatest = flash > 0.05 && i === stacks - 1;
+        ctx.fillStyle = isLatest ? '#ffffff' : i < stacks ? '#fef08a' : 'rgba(202, 138, 4, 0.55)';
         ctx.beginPath();
         ctx.arc(
           Math.cos(a) * (wheelR + 7),
           Math.sin(a) * (wheelR + 7),
-          i < stacks ? 3.8 : 2.6,
+          isLatest ? 5.8 : i < stacks ? 3.8 : 2.6,
           0,
           Math.PI * 2,
         );
