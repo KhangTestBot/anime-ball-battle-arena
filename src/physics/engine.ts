@@ -596,11 +596,35 @@ export class BattleEngine implements AbilityContext {
     const isKo = target.hp <= 0;
     const bigHitThreshold = Math.max(14, Math.min(180, target.maxHp * 0.085));
     const isBigHit = Boolean(opts?.isCrit) || dmg >= bigHitThreshold || isKo;
+
+    // Distinct high-contrast damage colors per attacker (so both fighters' damage numbers are immediately distinguishable!)
+    const DMG_SLOT_PALETTE = [
+      '#38bdf8', // Fighter 1 (Left): Bright Cyan-Blue
+      '#fb7185', // Fighter 2 (Right): Vivid Rose-Red
+      '#facc15', // Fighter 3: Gold
+      '#4ade80', // Fighter 4: Emerald
+      '#c084fc', // Fighter 5: Violet
+      '#fb923c', // Fighter 6: Orange
+      '#2dd4bf', // Fighter 7: Teal
+      '#f472b6', // Fighter 8: Pink
+    ];
+    let dmgColor = '#ffffff';
+    if (attacker) {
+      if (attacker.teamId === 0) {
+        dmgColor = '#38bdf8';
+      } else if (attacker.teamId === 1) {
+        dmgColor = '#fb7185';
+      } else {
+        const atkIdx = this.fighters.findIndex((x) => x.uid === attacker.uid);
+        dmgColor = DMG_SLOT_PALETTE[(atkIdx >= 0 ? atkIdx : 0) % DMG_SLOT_PALETTE.length];
+      }
+    }
+
     this.spawnFloatingText(
       target.x + (Math.random() - 0.5) * 18,
       target.y - target.radius - 6,
       isBigHit ? `-${dmg}!` : `-${dmg}`,
-      isKo ? '#ff2a5f' : isBigHit ? '#facc15' : '#ffffff',
+      dmgColor,
       isBigHit ? 'crit' : 'damage',
     );
 
