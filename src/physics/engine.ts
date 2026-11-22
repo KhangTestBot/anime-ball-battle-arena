@@ -1621,8 +1621,8 @@ export class BattleEngine implements AbilityContext {
           y: oy,
           w: 32,
           h: 32,
-          hp: 2,
-          maxHp: 2,
+          hp: 1,
+          maxHp: 1,
           life: 30,
           maxLife: 30,
           blocksProjectiles: false,
@@ -1669,11 +1669,11 @@ export class BattleEngine implements AbilityContext {
             ? 'DIAMOND ORE'
             : 'ANCIENT DEBRIS';
 
-      if (f.steveMinedOres < 10) {
+      if (f.steveMinedOres < 5) {
         this.spawnFloatingText(
           ore.x,
           ore.y - 16,
-          `MINED ${oreLabel} (${f.steveMinedOres}/10)`,
+          `MINED ${oreLabel} (${f.steveMinedOres}/5)`,
           ore.color,
           'callout',
         );
