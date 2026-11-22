@@ -1393,9 +1393,11 @@ export class BattleEngine implements AbilityContext {
       const excitedMult = f.getExcitedTimer > 0 ? 1.48 : 1.0;
       const drowsyMult = f.drowsyTimer > 0 ? 0.55 : 1.0;
       const frostMult = f.frostTimer > 0 ? 0.55 : 1.0;
+      // Transformations do NOT increase movement/bouncing speed so late-game fights stay readable
+      const baseFormSpeedMult = f.character.forms[0]?.speedMult ?? 1;
       const speedMult =
         f.character.baseStats.speed *
-        form.speedMult *
+        baseFormSpeedMult *
         (1 + (f.lolSpeedBonus ?? 0)) *
         excitedMult *
         drowsyMult *
