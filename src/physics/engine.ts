@@ -720,10 +720,10 @@ export class BattleEngine implements AbilityContext {
       this.updateFighterBase(f, dt);
       if (f.alive && !this.finished) {
         this.checkTransformations(f);
-        if (f.stunTimer <= 0 && !this.isSteveMining(f) && this.tryTriggerUltimate(f)) {
+        if (f.stunTimer <= 0 && this.tryTriggerUltimate(f)) {
           return;
         }
-        if (f.stunTimer <= 0 && !this.isSteveMining(f)) {
+        if (f.stunTimer <= 0) {
           const spiritMult = f.spiritLockTimer > 0 ? 0.6 : 1.0;
           const effDt = (f.silenceTimer > 0 ? dt * 0.4 : dt) * spiritMult;
           updateFighterAbilities(this, f, effDt);
@@ -1132,11 +1132,11 @@ export class BattleEngine implements AbilityContext {
       const sdBoost = this.suddenDeathActive ? 2.0 : 1.0;
       if (f.ultimateCooldown > 0) {
         f.ultimateCooldown = Math.max(0, f.ultimateCooldown - dt);
-      } else if (!this.isSteveMining(f)) {
+      } else {
         this.addUltimateCharge(f, dt * 2.1);
       }
 
-      // Steve Minecraft ore-mining progression (Wood -> Iron -> Diamond -> Full Netherite before fighting!)
+      // Steve Minecraft ore-mining progression (can fight at any armor tier; mines corner ores when free!)
       if (this.isSteveMining(f)) {
         this.updateSteveMining(f, dt);
       }
@@ -1321,33 +1321,35 @@ export class BattleEngine implements AbilityContext {
             o.ownerUid === f.uid &&
             (o.kind === 'iron-ore' || o.kind === 'diamond-ore' || o.kind === 'ancient-debris'),
         );
-        if (ore) {
+        const nearest = this.getNearestEnemy(f);
+        const enemyDist = nearest ? Math.hypot(nearest.x - f.x, nearest.y - f.y) : Infinity;
+        const oreDist = ore ? Math.hypot(ore.x - f.x, ore.y - f.y) : Infinity;
+        // When free (no enemy engaging up close, or already right next to corner ore), head to the corner to mine!
+        const isFreeToMine =
+          Boolean(ore) &&
+          !this.isUltimateActive(f) &&
+          (enemyDist > 165 || (oreDist < 120 && enemyDist > 110));
+
+        if (ore && isFreeToMine) {
           const dx = ore.x - f.x;
           const dy = ore.y - f.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist > 1) {
-            const nx = dx / dist;
-            const ny = dy / dist;
+          if (oreDist > 1) {
+            const nx = dx / oreDist;
+            const ny = dy / oreDist;
             const targetSpd = Math.max(255, Math.hypot(f.vx, f.vy));
             const desiredVx = nx * targetSpd;
             const desiredVy = ny * targetSpd;
-            // Smoothly steer toward the ore while damping tangential orbit velocity
-            const blend = Math.min(1, dt * (dist < 130 ? 6.5 : 3.6));
+            // Smoothly steer toward the corner ore while damping tangential orbit velocity
+            const blend = Math.min(1, dt * (oreDist < 130 ? 6.5 : 3.6));
             f.vx += (desiredVx - f.vx) * blend;
             f.vy += (desiredVy - f.vy) * blend;
           }
-        }
-        // Gently evade very close enemies while peacefully mining
-        const nearest = this.getNearestEnemy(f);
-        if (nearest) {
-          const edx = f.x - nearest.x;
-          const edy = f.y - nearest.y;
-          const edist = Math.hypot(edx, edy);
-          if (edist > 1 && edist < 125) {
-            const evadePull = 140 * f.character.baseStats.speed;
-            f.vx += (edx / edist) * evadePull * dt;
-            f.vy += (edy / edist) * evadePull * dt;
-          }
+        } else if (nearest && enemyDist > 1) {
+          // Enemy is close -> fight directly at any armor tier!
+          const steerDir = f.confusedTimer > 0 ? -1 : 1;
+          const pull = 72 * f.character.baseStats.speed * steerDir;
+          f.vx += ((nearest.x - f.x) / enemyDist) * pull * dt;
+          f.vy += ((nearest.y - f.y) / enemyDist) * pull * dt;
         }
       } else if (f.character.id === 'sukuna') {
         // Ranged kiting AI: Sukuna maintains mid-to-long distance to slice foes with Dismantle!
@@ -1598,21 +1600,35 @@ export class BattleEngine implements AbilityContext {
           kind === 'iron-ore' ? '#e2e8f0' : kind === 'diamond-ore' ? '#22d3ee' : '#c084fc';
         const secondaryColor =
           kind === 'iron-ore' ? '#cbd5e1' : kind === 'diamond-ore' ? '#67e8f9' : '#a855f7';
-        const pad = 68;
-        const minX = this.bounds.left + pad;
-        const maxX = Math.max(minX + 10, this.bounds.right - pad);
-        const minY = this.bounds.top + pad;
-        const maxY = Math.max(minY + 10, this.bounds.bottom - pad);
-        let ox = minX + Math.random() * (maxX - minX);
-        let oy = minY + Math.random() * (maxY - minY);
+        // Spawn ore strictly in one of the 4 arena corners (preferring corners clear of enemies & not under Steve)
+        const cornerPad = 56;
+        const corners = [
+          { x: this.bounds.left + cornerPad, y: this.bounds.top + cornerPad },
+          { x: this.bounds.right - cornerPad, y: this.bounds.top + cornerPad },
+          { x: this.bounds.left + cornerPad, y: this.bounds.bottom - cornerPad },
+          { x: this.bounds.right - cornerPad, y: this.bounds.bottom - cornerPad },
+        ];
         const enemies = this.getEnemies(f);
-        for (let tries = 0; tries < 18; tries++) {
-          const farFromSteve = Math.hypot(ox - f.x, oy - f.y) >= 185;
-          const clearOfEnemies = enemies.every((e) => Math.hypot(ox - e.x, oy - e.y) >= 105);
-          if (farFromSteve && clearOfEnemies) break;
-          ox = minX + Math.random() * (maxX - minX);
-          oy = minY + Math.random() * (maxY - minY);
-        }
+        const safeCorners = corners.filter(
+          (c) =>
+            Math.hypot(c.x - f.x, c.y - f.y) >= 120 &&
+            enemies.every((e) => Math.hypot(c.x - e.x, c.y - e.y) >= 110),
+        );
+        const pool =
+          safeCorners.length > 0
+            ? safeCorners
+            : corners.filter((c) => enemies.every((e) => Math.hypot(c.x - e.x, c.y - e.y) >= 90));
+        const chosen = (pool.length > 0 ? pool : corners)[
+          Math.floor(Math.random() * (pool.length > 0 ? pool.length : corners.length))
+        ];
+        const ox = Math.max(
+          this.bounds.left + 44,
+          Math.min(this.bounds.right - 44, chosen.x + (Math.random() - 0.5) * 24),
+        );
+        const oy = Math.max(
+          this.bounds.top + 44,
+          Math.min(this.bounds.bottom - 44, chosen.y + (Math.random() - 0.5) * 24),
+        );
         this.obstacles.push({
           id: this.nextId('ore'),
           ownerUid: f.uid,
@@ -1965,15 +1981,15 @@ export class BattleEngine implements AbilityContext {
           this.spawnParticles(mx, my, 7, '#38bdf8', 50, 170, 2, 4.5, 'spark');
         }
 
-        // Steve (while mining) and Sukuna (ranged Dismantle fighter) do not deal melee collision damage!
-        if (!this.isSteveMining(a) && a.character.id !== 'sukuna') {
+        // Sukuna (ranged Dismantle fighter) does not deal melee collision damage
+        if (a.character.id !== 'sukuna') {
           this.applyDamage(a, b, rawA, nx * 165, ny * 165, {
             isCrit: isHeavyClash,
             sourceKind: 'collision',
             allowLifesteal: (this.getForm(a).lifestealRatio ?? 0) > 0,
           });
         }
-        if (b.alive && !this.isSteveMining(b) && b.character.id !== 'sukuna') {
+        if (b.alive && b.character.id !== 'sukuna') {
           this.applyDamage(b, a, rawB, -nx * 165, -ny * 165, {
             isCrit: isHeavyClash,
             sourceKind: 'collision',

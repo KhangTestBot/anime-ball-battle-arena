@@ -58,46 +58,67 @@ describe('Steve Mining Progression & No Time-Based DMG% Scaling', () => {
     expect(b.hp).toBe(hpBeforeWall);
   });
 
-  it('Steve mines Iron -> Diamond -> Ancient Debris to reach Full Netherite before attacking', () => {
+  it('Steve can fight at any armor tier (even Wood Gear) and mines corner ores when free without healing', () => {
+    // 1. Verify Steve fights and deals damage right away in Wood Gear (formIndex === 0)
+    const fightEngine = makeDuel('steve', 'goku', 5000);
+    const [steveFight, gokuFight] = fightEngine.fighters;
+    expect(steveFight.formIndex).toBe(0);
+    gokuFight.stunTimer = 999;
+    steveFight.x = 300;
+    steveFight.y = 300;
+    gokuFight.x = 360;
+    gokuFight.y = 300;
+    for (let i = 0; i < 180 && steveFight.damageDealt === 0; i++) {
+      fightEngine.step(1 / 60);
+    }
+    expect(steveFight.formIndex).toBe(0);
+    expect(steveFight.damageDealt).toBeGreaterThan(0);
+
+    // 2. Verify when free, Steve spawns ores in the corners and mines 5 per tier to Full Netherite without healing
     const engine = makeDuel('steve', 'goku', 5000);
     const [steve, goku] = engine.fighters;
-    // Keep Goku stunned in a corner so we can cleanly test Steve's mining progression & peaceful behavior
     goku.stunTimer = 999;
     goku.x = engine.bounds.right - 40;
     goku.y = engine.bounds.bottom - 40;
+    // Keep Steve's abilities on cooldown during pure corner-mining check so Ultimate doesn't end the match early
+    steve.ultimateCooldown = 999;
+    steve.abilityTimer = 999;
 
     expect(steve.formIndex).toBe(0);
     expect(steve.character.forms[0].name).toBe('Wood Gear');
     steve.hp = 2500; // Start at half HP to confirm upgrading armor does NOT heal Steve!
 
-    // Step until Steve spawns & mines all 30 ores (10 Iron, 10 Diamond, 10 Ancient Debris)
     let reachedIron = false;
     let reachedDiamond = false;
     let reachedNetherite = false;
-    let damagedBeforeNetherite = false;
+    let sawCornerOre = false;
 
-    for (let i = 0; i < 14000 && !reachedNetherite; i++) {
+    for (let i = 0; i < 8000 && !reachedNetherite; i++) {
+      steve.abilityTimer = 999;
       engine.step(1 / 60);
-      if (steve.formIndex < 3 && steve.damageDealt > 0) {
-        damagedBeforeNetherite = true;
+      const ore = engine.obstacles.find(
+        (o) =>
+          o.ownerUid === steve.uid &&
+          (o.kind === 'iron-ore' || o.kind === 'diamond-ore' || o.kind === 'ancient-debris'),
+      );
+      if (ore) {
+        const nearLeftOrRight =
+          ore.x - engine.bounds.left <= 95 || engine.bounds.right - ore.x <= 95;
+        const nearTopOrBottom =
+          ore.y - engine.bounds.top <= 95 || engine.bounds.bottom - ore.y <= 95;
+        expect(nearLeftOrRight && nearTopOrBottom).toBe(true);
+        sawCornerOre = true;
       }
       if (steve.formIndex === 1) reachedIron = true;
       if (steve.formIndex === 2) reachedDiamond = true;
       if (steve.formIndex === 3) reachedNetherite = true;
     }
 
-    expect(damagedBeforeNetherite).toBe(false);
+    expect(sawCornerOre).toBe(true);
     expect(reachedIron).toBe(true);
     expect(reachedDiamond).toBe(true);
     expect(reachedNetherite).toBe(true);
     expect(steve.hp).toBe(2500);
     expect(steve.character.forms[steve.formIndex].name).toBe('Full Netherite');
-
-    // Once Full Netherite is crafted, Steve switches to combat mode and deals damage!
-    goku.stunTimer = 0;
-    for (let i = 0; i < 420 && steve.damageDealt === 0; i++) {
-      engine.step(1 / 60);
-    }
-    expect(steve.damageDealt).toBeGreaterThan(0);
   });
 });
