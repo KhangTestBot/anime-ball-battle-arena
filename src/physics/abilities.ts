@@ -1806,11 +1806,12 @@ export function updateProjectiles(ctx: AbilityContext, dt: number): void {
         }
       }
 
-      // Homing steering (Six Eyes Gojo & Raphael/Ciel Rimuru projectiles steer fast up to 720 px/s!)
+      // Homing steering (Six Eyes Gojo, Raphael/Ciel Rimuru & Enchanted Steve projectiles steer fast up to 720 px/s!)
       if (p.homing) {
         const nearest = findNearestEnemyFromPos(ctx, p.ownerUid, p.teamId, p.x, p.y);
         if (nearest) {
-          const isHighAccuracy = p.ownerCharId === 'gojo' || p.ownerCharId === 'rimuru';
+          const isHighAccuracy =
+            p.ownerCharId === 'gojo' || p.ownerCharId === 'rimuru' || p.ownerCharId === 'steve';
           const dir = normalize(nearest.x - p.x, nearest.y - p.y);
           const steer = isHighAccuracy ? 1550 : 780;
           const cap = isHighAccuracy ? 720 : 430;
@@ -3272,14 +3273,14 @@ export function executeSkillDef(
     case 'projectile-fan': {
       const count = skill.count ?? 3;
       const kind = skill.projectileKind ?? 'sword-wave';
-      const isRimuru = charId === 'rimuru';
-      const spreadStep = isRimuru ? 0.11 : count >= 5 ? 0.16 : 0.2;
+      const isPrecisionFan = charId === 'rimuru' || charId === 'steve';
+      const spreadStep = isPrecisionFan ? 0.1 : count >= 5 ? 0.16 : 0.2;
       const isCrescent = kind === 'getsuga' || kind === 'sword-wave' || kind === 'tornado';
       const speed =
         (isCrescent ? 540 + form.powerLevel * 32 : 470 + form.powerLevel * 28) +
-        (isRimuru ? 160 : 0);
+        (isPrecisionFan ? 165 : 0);
       let baseAngle = angle;
-      if (isRimuru) {
+      if (isPrecisionFan) {
         const nearest = ctx.getNearestEnemy(f);
         if (nearest) {
           const d = Math.hypot(nearest.x - f.x, nearest.y - f.y);
@@ -3304,7 +3305,8 @@ export function executeSkillDef(
           vx: Math.cos(a) * speed,
           vy: Math.sin(a) * speed,
           radius:
-            (isCrescent ? 22 + form.powerLevel * 1.5 : 13 + form.powerLevel) + (isRimuru ? 4 : 0),
+            (isCrescent ? 22 + form.powerLevel * 1.5 : 13 + form.powerLevel) +
+            (isPrecisionFan ? 4 : 0),
           damage: ctx.getEffectiveDamage(f, (5.2 + form.powerLevel * 1.05) * pwr),
           knockback: isCrescent ? 280 : 210,
           color,
@@ -3312,8 +3314,8 @@ export function executeSkillDef(
           angle: a,
           life: 1.6,
           maxLife: 1.6,
-          piercing: isCrescent,
-          homing: isRimuru,
+          piercing: isCrescent || charId === 'steve',
+          homing: isPrecisionFan,
           blocksProjectiles: kind === 'tornado' || f.character.id === 'asta',
           hitCooldowns: {},
           powerLevel: form.powerLevel,
@@ -3427,9 +3429,9 @@ export function executeSkillDef(
     case 'homing-swarm': {
       const count = skill.count ?? 3;
       const kind = skill.projectileKind ?? 'foxfire';
-      const isRimuru = charId === 'rimuru';
-      const spread = isRimuru ? 0.26 : 0.52;
-      const spd = isRimuru ? 550 : 380;
+      const isPrecisionSwarm = charId === 'rimuru' || charId === 'steve';
+      const spread = isPrecisionSwarm ? 0.24 : 0.52;
+      const spd = isPrecisionSwarm ? 560 : 380;
       for (let i = 0; i < count; i++) {
         const a = angle + (i - (count - 1) / 2) * spread;
         ctx.projectiles.push({
@@ -3443,7 +3445,7 @@ export function executeSkillDef(
           y: f.y + Math.sin(a) * (f.radius + 12),
           vx: Math.cos(a) * spd,
           vy: Math.sin(a) * spd,
-          radius: kind === 'dagger-blade' || isRimuru ? 14 : 11,
+          radius: kind === 'dagger-blade' || isPrecisionSwarm ? 14 : 11,
           damage: ctx.getEffectiveDamage(f, (4.8 + form.powerLevel * 0.8) * pwr),
           knockback: 150,
           color,
@@ -3462,9 +3464,9 @@ export function executeSkillDef(
     }
 
     case 'beam-shot': {
-      const isRimuru = f.character.id === 'rimuru';
+      const isPrecisionBeam = f.character.id === 'rimuru' || f.character.id === 'steve';
       let beamAngle = angle;
-      if (isRimuru) {
+      if (isPrecisionBeam) {
         const nearest = ctx.getNearestEnemy(f);
         if (nearest) {
           beamAngle = Math.atan2(
@@ -3488,7 +3490,7 @@ export function executeSkillDef(
         originX: f.x,
         originY: f.y,
         angle: beamAngle,
-        width: 20 + form.powerLevel * 3.8 + (isRimuru ? 10 : 0),
+        width: 20 + form.powerLevel * 3.8 + (isPrecisionBeam ? 12 : 0),
         damagePerTick: ctx.getEffectiveDamage(f, (3.6 + form.powerLevel * 0.65) * pwr),
         color,
         coreColor: '#ffffff',
@@ -3665,16 +3667,32 @@ export function executeSkillDef(
     case 'drop-bomb': {
       const count = (skill.count ?? 1) + (form.powerLevel >= 4 ? 1 : 0);
       const bKind = skill.bombKind ?? 'tnt';
+      const isSteveTnt = charId === 'steve' && bKind === 'tnt';
+      const anchorX = isSteveTnt ? target.x : f.x;
+      const anchorY = isSteveTnt ? target.y : f.y;
       for (let i = 0; i < count; i++) {
         const ox = Math.max(
           ctx.bounds.left + 28,
-          Math.min(ctx.bounds.right - 28, f.x + (i === 0 ? 0 : (Math.random() - 0.5) * 95)),
+          Math.min(
+            ctx.bounds.right - 28,
+            anchorX + (i === 0 ? 0 : (Math.random() - 0.5) * (isSteveTnt ? 72 : 95)),
+          ),
         );
         const oy = Math.max(
           ctx.bounds.top + 28,
-          Math.min(ctx.bounds.bottom - 28, f.y + (i === 0 ? 0 : (Math.random() - 0.5) * 95)),
+          Math.min(
+            ctx.bounds.bottom - 28,
+            anchorY + (i === 0 ? 0 : (Math.random() - 0.5) * (isSteveTnt ? 72 : 95)),
+          ),
         );
-        const fuse = bKind === 'obsidian-block' ? 3.2 : bKind === 'chomper' ? 2.4 : 0.95 + i * 0.14;
+        const fuse =
+          bKind === 'obsidian-block'
+            ? 3.2
+            : bKind === 'chomper'
+              ? 2.4
+              : isSteveTnt
+                ? 0.58 + i * 0.1
+                : 0.95 + i * 0.14;
         ctx.bombs.push({
           id: ctx.nextId('tnt'),
           ownerUid: f.uid,
@@ -3683,7 +3701,7 @@ export function executeSkillDef(
           x: ox,
           y: oy,
           radius: bKind === 'obsidian-block' ? 21 : 17,
-          blastRadius: 145 + form.powerLevel * 14,
+          blastRadius: (isSteveTnt ? 175 : 145) + form.powerLevel * 15,
           damage: ctx.getEffectiveDamage(f, (10.5 + form.powerLevel * 1.6) * pwr),
           fuseTimer: fuse,
           maxFuse: fuse,

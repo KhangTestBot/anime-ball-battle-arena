@@ -185,7 +185,63 @@ export const steveUltimateRenderer: UltimateRenderer = {
       }
     }
 
-    // 2. Falling Iron Anvils (Classic T-shaped pixelated Minecraft Anvil + shrinking drop shadow!)
+    // 2. Ultra-Wide Ender Dragon Breath Cone (colossal violet-magenta torrent!)
+    if (data.dragonBreathActive) {
+      const fade = Math.min(1, data.dragonBreathTimer / 0.25);
+      const ox = data.dragonBreathX;
+      const oy = data.dragonBreathY;
+      const range = data.dragonBreathRange;
+      const halfCone = data.dragonBreathHalfCone;
+      const ang = data.dragonBreathAngle;
+
+      ctx.save();
+      ctx.globalAlpha = fade * 0.88;
+      ctx.translate(ox, oy);
+      ctx.rotate(ang);
+
+      // Outer wide violet-magenta Dragon Breath cone
+      const outerGrad = ctx.createRadialGradient(0, 0, 12, 0, 0, range);
+      outerGrad.addColorStop(0, 'rgba(240, 171, 252, 0.92)');
+      outerGrad.addColorStop(0.35, 'rgba(192, 132, 252, 0.62)');
+      outerGrad.addColorStop(0.75, 'rgba(126, 34, 206, 0.34)');
+      outerGrad.addColorStop(1, 'rgba(88, 28, 135, 0)');
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, range, -halfCone, halfCone);
+      ctx.closePath();
+      ctx.fillStyle = outerGrad;
+      ctx.fill();
+
+      // Inner blazing fuchsia-white breath core
+      const innerGrad = ctx.createRadialGradient(0, 0, 6, 0, 0, range * 0.78);
+      innerGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      innerGrad.addColorStop(0.45, 'rgba(232, 121, 249, 0.68)');
+      innerGrad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, range * 0.78, -halfCone * 0.52, halfCone * 0.52);
+      ctx.closePath();
+      ctx.fillStyle = innerGrad;
+      ctx.fill();
+
+      // Swirling pixelated Ender Breath flame embers streaming outward
+      for (let i = 0; i < 18; i++) {
+        const prog = (((t * 2.8 + i * 0.19) % 1) + 1) % 1;
+        const r = 24 + prog * (range - 30);
+        const a = Math.sin(i * 4.7 + t * 9) * halfCone * 0.85;
+        const px = Math.cos(a) * r;
+        const py = Math.sin(a) * r;
+        const sz = (1 - prog * 0.55) * (6 + (i % 3) * 3);
+        ctx.fillStyle = i % 2 === 0 ? '#f5d0fe' : '#c084fc';
+        ctx.fillRect(px - sz * 0.5, py - sz * 0.5, sz, sz);
+      }
+
+      ctx.restore();
+    }
+
+    // 3. Falling Iron Anvils (Classic T-shaped pixelated Minecraft Anvil + shrinking drop shadow!)
     for (const anvil of data.anvils) {
       const p = Math.min(1, anvil.progress);
       const shadowScale = 0.35 + p * 0.65;

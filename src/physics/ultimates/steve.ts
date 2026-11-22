@@ -17,6 +17,22 @@ export interface SteveUltimateData {
   anvilsDropped: number;
   fortressBuilt: boolean;
   midVolleyFired: boolean;
+  dragonBreathActive: boolean;
+  dragonBreathTimer: number;
+  dragonBreathTickCd: number;
+  dragonBreathWavesFired: number;
+  dragonBreathX: number;
+  dragonBreathY: number;
+  dragonBreathAngle: number;
+  dragonBreathRange: number;
+  dragonBreathHalfCone: number;
+}
+
+function angleDiff(a: number, b: number): number {
+  let d = a - b;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -75,9 +91,18 @@ function spawnSteveEnderDragon(ctx: AbilityContext, f: FighterState): void {
 
 function fireChannelingTridentVolley(ctx: AbilityContext, owner: FighterState): void {
   const target = ctx.getNearestEnemy(owner);
-  const baseAng = target ? Math.atan2(target.y - owner.y, target.x - owner.x) : owner.facingAngle;
+  const speed = 710;
+  let baseAng = owner.facingAngle;
+  if (target) {
+    const d = Math.hypot(target.x - owner.x, target.y - owner.y);
+    const leadT = Math.min(0.36, d / speed);
+    baseAng = Math.atan2(
+      target.y + target.vy * leadT - owner.y,
+      target.x + target.vx * leadT - owner.x,
+    );
+  }
   const count = 6;
-  const spread = 0.88;
+  const spread = 0.48;
 
   for (let i = 0; i < count; i++) {
     const a = baseAng - spread * 0.5 + (spread * i) / (count - 1);
@@ -90,10 +115,10 @@ function fireChannelingTridentVolley(ctx: AbilityContext, owner: FighterState): 
       kind: 'arrow-trident',
       x: owner.x + Math.cos(a) * (owner.radius + 10),
       y: owner.y + Math.sin(a) * (owner.radius + 10),
-      vx: Math.cos(a) * 640,
-      vy: Math.sin(a) * 640,
-      radius: 10,
-      damage: ctx.getEffectiveDamage(owner, 13.2),
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      radius: 13,
+      damage: ctx.getEffectiveDamage(owner, 13.8),
       knockback: 310,
       color: '#22d3ee',
       secondaryColor: '#a855f7',
@@ -101,6 +126,7 @@ function fireChannelingTridentVolley(ctx: AbilityContext, owner: FighterState): 
       life: 2.0,
       maxLife: 2.0,
       piercing: true,
+      homing: true,
       hitCooldowns: {},
       powerLevel: ctx.getForm(owner).powerLevel,
     });
@@ -177,20 +203,31 @@ function buildObsidianFortress(ctx: AbilityContext, owner: FighterState): void {
 
 export const steveUltimateHandler: UltimateHandler = {
   characterId: 'steve',
-  title: 'NETHERITE FORTRESS & TOTEM OF UNDYING',
+  title: 'NETHERITE FORTRESS & ENDER DRAGON BREATH',
   subtitle:
-    'Creative Mode: Durable Obsidian fortress · Enchanted Armor + Unstoppable + Totem · 6 Tridents, 4 shield-breaking Anvils & Ender Dragon!',
+    'Creative Mode: Obsidian fortress · Enchanted Armor + Totem · Homing Tridents, Falling Anvils & Ultimate Ender Dragon breathing an ultra-wide violet devastation cone!',
   bannerColor: '#a855f7',
   castDuration: 0.3,
   duration: 5.0,
 
   onCast(ctx, owner, state) {
+    const target = ctx.getNearestEnemy(owner);
+    const initAng = target ? Math.atan2(target.y - owner.y, target.x - owner.x) : owner.facingAngle;
     const data: SteveUltimateData = {
       anvils: [],
       nextAnvilTimer: 0.42,
       anvilsDropped: 0,
       fortressBuilt: false,
       midVolleyFired: false,
+      dragonBreathActive: false,
+      dragonBreathTimer: 0,
+      dragonBreathTickCd: 0,
+      dragonBreathWavesFired: 0,
+      dragonBreathX: owner.x,
+      dragonBreathY: owner.y - 40,
+      dragonBreathAngle: initAng,
+      dragonBreathRange: 470,
+      dragonBreathHalfCone: 0.84, // ~96 degree ultra-wide Ender Dragon Breath cone!
     };
     state.data = data as unknown as Record<string, unknown>;
 
@@ -245,6 +282,100 @@ export const steveUltimateHandler: UltimateHandler = {
     if (!data.midVolleyFired && state.elapsed >= 2.4) {
       data.midVolleyFired = true;
       fireChannelingTridentVolley(ctx, owner);
+    }
+
+    // Ultimate Ender Dragon Ultra-Wide Dragon Breath sweeps (2 massive bursts at 0.8s & 2.7s!)
+    const dragon = ctx.minions.find((m) => m.ownerUid === owner.uid && m.kind === 'ender-dragon');
+    const breathOriginX = dragon ? dragon.x : owner.x;
+    const breathOriginY = dragon ? dragon.y : owner.y;
+    const nearestEnemy = ctx.getNearestEnemy(owner);
+
+    if (
+      (data.dragonBreathWavesFired === 0 && state.elapsed >= 0.8) ||
+      (data.dragonBreathWavesFired === 1 && state.elapsed >= 2.7)
+    ) {
+      data.dragonBreathWavesFired += 1;
+      data.dragonBreathActive = true;
+      data.dragonBreathTimer = 1.35;
+      data.dragonBreathTickCd = 0;
+      data.dragonBreathX = breathOriginX;
+      data.dragonBreathY = breathOriginY;
+      if (nearestEnemy) {
+        data.dragonBreathAngle = Math.atan2(
+          nearestEnemy.y - breathOriginY,
+          nearestEnemy.x - breathOriginX,
+        );
+      }
+      ctx.addScreenShake(10);
+      ctx.emitSfx({ type: 'beam-fire', intensity: 1.35 });
+    }
+
+    if (data.dragonBreathActive) {
+      data.dragonBreathTimer -= dt;
+      data.dragonBreathX = breathOriginX;
+      data.dragonBreathY = breathOriginY;
+      if (nearestEnemy) {
+        const desired = Math.atan2(nearestEnemy.y - breathOriginY, nearestEnemy.x - breathOriginX);
+        const diff = angleDiff(desired, data.dragonBreathAngle);
+        data.dragonBreathAngle += diff * Math.min(1, dt * 4.5);
+      }
+      data.dragonBreathTickCd -= dt;
+      if (data.dragonBreathTickCd <= 0) {
+        data.dragonBreathTickCd = 0.24;
+        const enemies = ctx.getEnemies(owner);
+        for (const e of enemies) {
+          const dx = e.x - data.dragonBreathX;
+          const dy = e.y - data.dragonBreathY;
+          const dist = Math.hypot(dx, dy);
+          const ang = Math.atan2(dy, dx);
+          if (
+            dist <= data.dragonBreathRange + e.radius &&
+            (dist <= 75 + e.radius ||
+              Math.abs(angleDiff(ang, data.dragonBreathAngle)) <= data.dragonBreathHalfCone)
+          ) {
+            e.armorShredTimer = Math.max(e.armorShredTimer, 2.0);
+            ctx.applyDamage(
+              owner,
+              e,
+              ctx.getEffectiveDamage(owner, 9.6),
+              Math.cos(data.dragonBreathAngle) * 180,
+              Math.sin(data.dragonBreathAngle) * 180,
+              { sourceKind: 'ability' },
+            );
+            ctx.spawnParticles(e.x, e.y, 10, '#e879f9', 60, 220, 3, 6.5, 'circle');
+          }
+        }
+        // Leave huge lingering violet Dragon Breath acid pools across the breath cone!
+        const poolDist = 110 + Math.random() * 210;
+        const poolAng =
+          data.dragonBreathAngle + (Math.random() - 0.5) * data.dragonBreathHalfCone * 1.4;
+        const px = clamp(
+          data.dragonBreathX + Math.cos(poolAng) * poolDist,
+          ctx.bounds.left + 32,
+          ctx.bounds.right - 32,
+        );
+        const py = clamp(
+          data.dragonBreathY + Math.sin(poolAng) * poolDist,
+          ctx.bounds.top + 32,
+          ctx.bounds.bottom - 32,
+        );
+        ctx.trails.push({
+          id: ctx.nextId('tr'),
+          ownerUid: owner.uid,
+          teamId: owner.teamId,
+          x: px,
+          y: py,
+          radius: 52,
+          life: 2.8,
+          maxLife: 2.8,
+          damagePerTick: ctx.getEffectiveDamage(owner, 4.2),
+          element: 'dragon-breath',
+          hitCooldowns: {},
+        });
+      }
+      if (data.dragonBreathTimer <= 0) {
+        data.dragonBreathActive = false;
+      }
     }
 
     // Drop up to 4 Falling Iron Anvils onto enemy positions!
@@ -323,6 +454,12 @@ export const steveUltimateHandler: UltimateHandler = {
     // Cleanly disarm unused Totem when ultimate ends
     owner.totemActive = false;
     owner.enchantArmorTimer = Math.min(owner.enchantArmorTimer, 0.2);
+    // Ultimate Ender Dragon departs when Steve's Ultimate finishes (not a permanent sidekick)
+    for (const m of ctx.minions) {
+      if (m.ownerUid === owner.uid && m.kind === 'ender-dragon') {
+        m.life = Math.min(m.life, 0.25);
+      }
+    }
     // Remaining Steve obstacles fade out naturally via their life timer
     for (const obs of ctx.obstacles) {
       if (obs.ownerUid === owner.uid) {
