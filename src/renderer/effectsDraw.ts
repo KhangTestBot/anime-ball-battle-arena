@@ -2935,6 +2935,10 @@ export function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle
 
 export function drawFloatingTexts(ctx: CanvasRenderingContext2D, texts: FloatingText[]): void {
   for (const ft of texts) {
+    // Keep the arena clean: hide skill/callout/powerup text banners, render only numeric damage/heal popups
+    if (ft.kind === 'callout' || ft.kind === 'powerup') continue;
+    if (ft.kind === 'crit' && !/^[+-]?\d/.test(ft.text.trim())) continue;
+
     const progress = 1 - ft.life / ft.maxLife;
     const alpha = ft.life < 0.25 ? ft.life / 0.25 : 1;
     const popScale =
@@ -2947,10 +2951,10 @@ export function drawFloatingTexts(ctx: CanvasRenderingContext2D, texts: Floating
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const weight = ft.kind === 'powerup' || ft.kind === 'crit' ? '900' : '800';
+    const weight = ft.kind === 'crit' ? '900' : '800';
     ctx.font = `${weight} ${ft.size}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`;
 
-    ctx.lineWidth = ft.kind === 'powerup' || ft.kind === 'crit' ? 5.5 : 4;
+    ctx.lineWidth = ft.kind === 'crit' ? 5.5 : 4;
     ctx.lineJoin = 'round';
     ctx.strokeStyle = ft.strokeColor;
     ctx.strokeText(ft.text, 0, 0);
