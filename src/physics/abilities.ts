@@ -1806,14 +1806,14 @@ export function updateProjectiles(ctx: AbilityContext, dt: number): void {
         }
       }
 
-      // Homing steering (Six Eyes Gojo orbs steer fast up to 720 px/s!)
+      // Homing steering (Six Eyes Gojo & Raphael/Ciel Rimuru projectiles steer fast up to 720 px/s!)
       if (p.homing) {
         const nearest = findNearestEnemyFromPos(ctx, p.ownerUid, p.teamId, p.x, p.y);
         if (nearest) {
-          const isGojoOrb = p.ownerCharId === 'gojo';
+          const isHighAccuracy = p.ownerCharId === 'gojo' || p.ownerCharId === 'rimuru';
           const dir = normalize(nearest.x - p.x, nearest.y - p.y);
-          const steer = isGojoOrb ? 1550 : 780;
-          const cap = isGojoOrb ? 720 : 430;
+          const steer = isHighAccuracy ? 1550 : 780;
+          const cap = isHighAccuracy ? 720 : 430;
           p.vx += dir.x * steer * dt;
           p.vy += dir.y * steer * dt;
           const spd = Math.hypot(p.vx, p.vy);
@@ -3272,11 +3272,26 @@ export function executeSkillDef(
     case 'projectile-fan': {
       const count = skill.count ?? 3;
       const kind = skill.projectileKind ?? 'sword-wave';
-      const spreadStep = count >= 5 ? 0.16 : 0.2;
+      const isRimuru = charId === 'rimuru';
+      const spreadStep = isRimuru ? 0.11 : count >= 5 ? 0.16 : 0.2;
       const isCrescent = kind === 'getsuga' || kind === 'sword-wave' || kind === 'tornado';
-      const speed = isCrescent ? 540 + form.powerLevel * 32 : 470 + form.powerLevel * 28;
+      const speed =
+        (isCrescent ? 540 + form.powerLevel * 32 : 470 + form.powerLevel * 28) +
+        (isRimuru ? 160 : 0);
+      let baseAngle = angle;
+      if (isRimuru) {
+        const nearest = ctx.getNearestEnemy(f);
+        if (nearest) {
+          const d = Math.hypot(nearest.x - f.x, nearest.y - f.y);
+          const leadT = Math.min(0.38, d / speed);
+          baseAngle = Math.atan2(
+            nearest.y + nearest.vy * leadT - f.y,
+            nearest.x + nearest.vx * leadT - f.x,
+          );
+        }
+      }
       for (let i = 0; i < count; i++) {
-        const a = angle + (i - (count - 1) / 2) * spreadStep;
+        const a = baseAngle + (i - (count - 1) / 2) * spreadStep;
         ctx.projectiles.push({
           id: ctx.nextId('proj'),
           ownerUid: f.uid,
@@ -3288,7 +3303,8 @@ export function executeSkillDef(
           y: f.y + Math.sin(a) * (f.radius + 14),
           vx: Math.cos(a) * speed,
           vy: Math.sin(a) * speed,
-          radius: isCrescent ? 22 + form.powerLevel * 1.5 : 13 + form.powerLevel,
+          radius:
+            (isCrescent ? 22 + form.powerLevel * 1.5 : 13 + form.powerLevel) + (isRimuru ? 4 : 0),
           damage: ctx.getEffectiveDamage(f, (5.2 + form.powerLevel * 1.05) * pwr),
           knockback: isCrescent ? 280 : 210,
           color,
@@ -3297,6 +3313,7 @@ export function executeSkillDef(
           life: 1.6,
           maxLife: 1.6,
           piercing: isCrescent,
+          homing: isRimuru,
           blocksProjectiles: kind === 'tornado' || f.character.id === 'asta',
           hitCooldowns: {},
           powerLevel: form.powerLevel,
@@ -3311,14 +3328,26 @@ export function executeSkillDef(
       const isPurple = kind === 'purple';
       const isRocket = kind === 'rocket';
       const isGojo = charId === 'gojo';
+      const isRimuru = charId === 'rimuru';
+      const isPrecisionOrb = isGojo || isRimuru;
       const radius =
         (isPurple ? 34 + form.powerLevel * 2.5 : isRocket ? 16 : 24 + form.powerLevel * 2) +
-        (isGojo ? 6 : 0);
-      const speed = isGojo ? (isPurple ? 640 : 680) : isPurple ? 330 : isRocket ? 520 : 370;
+        (isPrecisionOrb ? 6 : 0);
+      const speed = isGojo
+        ? isPurple
+          ? 640
+          : 680
+        : isRimuru
+          ? 650
+          : isPurple
+            ? 330
+            : isRocket
+              ? 520
+              : 370;
 
-      // Six Eyes predictive lead-aiming for Gojo's Blue, Red & Hollow Purple!
+      // Six Eyes (Gojo) & Great Sage / Raphael / Ciel (Rimuru) predictive lead-aiming!
       let fireAngle = angle;
-      if (isGojo) {
+      if (isPrecisionOrb) {
         const nearest = ctx.getNearestEnemy(f);
         if (nearest) {
           const d = Math.hypot(nearest.x - f.x, nearest.y - f.y);
@@ -3350,7 +3379,7 @@ export function executeSkillDef(
         life: 2.3,
         maxLife: 2.3,
         piercing: isPurple,
-        homing: isGojo,
+        homing: isPrecisionOrb,
         explosiveRadius: isPurple ? undefined : 115 + form.powerLevel * 10,
         hitCooldowns: {},
         powerLevel: form.powerLevel + (isPurple ? 1 : 0),
@@ -3398,8 +3427,11 @@ export function executeSkillDef(
     case 'homing-swarm': {
       const count = skill.count ?? 3;
       const kind = skill.projectileKind ?? 'foxfire';
+      const isRimuru = charId === 'rimuru';
+      const spread = isRimuru ? 0.26 : 0.52;
+      const spd = isRimuru ? 550 : 380;
       for (let i = 0; i < count; i++) {
-        const a = angle + (i - (count - 1) / 2) * 0.52;
+        const a = angle + (i - (count - 1) / 2) * spread;
         ctx.projectiles.push({
           id: ctx.nextId('proj'),
           ownerUid: f.uid,
@@ -3409,9 +3441,9 @@ export function executeSkillDef(
           kind,
           x: f.x + Math.cos(a) * (f.radius + 12),
           y: f.y + Math.sin(a) * (f.radius + 12),
-          vx: Math.cos(a) * 380,
-          vy: Math.sin(a) * 380,
-          radius: kind === 'dagger-blade' ? 14 : 11,
+          vx: Math.cos(a) * spd,
+          vy: Math.sin(a) * spd,
+          radius: kind === 'dagger-blade' || isRimuru ? 14 : 11,
           damage: ctx.getEffectiveDamage(f, (4.8 + form.powerLevel * 0.8) * pwr),
           knockback: 150,
           color,
@@ -3430,6 +3462,17 @@ export function executeSkillDef(
     }
 
     case 'beam-shot': {
+      const isRimuru = f.character.id === 'rimuru';
+      let beamAngle = angle;
+      if (isRimuru) {
+        const nearest = ctx.getNearestEnemy(f);
+        if (nearest) {
+          beamAngle = Math.atan2(
+            nearest.y + nearest.vy * 0.08 - f.y,
+            nearest.x + nearest.vx * 0.08 - f.x,
+          );
+        }
+      }
       const style =
         f.character.id === 'sans'
           ? 'gaster'
@@ -3444,8 +3487,8 @@ export function executeSkillDef(
         teamId: f.teamId,
         originX: f.x,
         originY: f.y,
-        angle,
-        width: 20 + form.powerLevel * 3.8,
+        angle: beamAngle,
+        width: 20 + form.powerLevel * 3.8 + (isRimuru ? 10 : 0),
         damagePerTick: ctx.getEffectiveDamage(f, (3.6 + form.powerLevel * 0.65) * pwr),
         color,
         coreColor: '#ffffff',
@@ -3455,22 +3498,24 @@ export function executeSkillDef(
         powerLevel: form.powerLevel,
         style,
       });
-      f.vx -= Math.cos(angle) * 140;
-      f.vy -= Math.sin(angle) * 140;
+      f.vx -= Math.cos(beamAngle) * 140;
+      f.vy -= Math.sin(beamAngle) * 140;
       ctx.addScreenShake(5.5);
       ctx.emitSfx({ type: 'beam-fire', intensity: 1.0 });
       break;
     }
 
     case 'slash-cross': {
+      const isRimuru = charId === 'rimuru';
       const count = (skill.count ?? 4) + (form.powerLevel >= 4 ? 2 : 0);
       const enemies = ctx.getEnemies(f);
       const { left, right, top, bottom } = ctx.bounds;
       const span = Math.max(right - left, bottom - top);
       for (let i = 0; i < count; i++) {
         const focus = enemies.length > 0 ? enemies[i % enemies.length] : target;
-        const cx = focus.x + (Math.random() - 0.5) * 75;
-        const cy = focus.y + (Math.random() - 0.5) * 75;
+        const scatter = isRimuru ? 22 : 75;
+        const cx = focus.x + (Math.random() - 0.5) * scatter;
+        const cy = focus.y + (Math.random() - 0.5) * scatter;
         const ang = (Math.PI / count) * i + (Math.random() - 0.5) * 0.5;
         const halfLen = span * 0.3;
         ctx.slashes.push({
@@ -3483,8 +3528,8 @@ export function executeSkillDef(
           y2: cy + Math.sin(ang) * halfLen,
           color,
           coreColor: '#ffffff',
-          width: 5 + form.powerLevel * 0.7,
-          telegraphTimer: 0.2 + i * 0.03,
+          width: 5 + form.powerLevel * 0.7 + (isRimuru ? 2.5 : 0),
+          telegraphTimer: isRimuru ? 0.11 + i * 0.02 : 0.2 + i * 0.03,
           activeTimer: 0.09,
           fadeTimer: 0.24,
           maxFade: 0.24,

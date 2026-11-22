@@ -127,8 +127,8 @@ export const rimuruUltimateHandler: UltimateHandler = {
       );
       ctx.emitSfx({ type: 'crit', intensity: 1.15 });
       for (const e of enemies) {
-        if (Math.hypot(e.x - owner.x, e.y - owner.y) <= 270) {
-          ctx.applyDamage(owner, e, ctx.getEffectiveDamage(owner, 7.8), 0, 0, {
+        if (Math.hypot(e.x - owner.x, e.y - owner.y) <= 320) {
+          ctx.applyDamage(owner, e, ctx.getEffectiveDamage(owner, 9.8), 0, 0, {
             sourceKind: 'ability',
           });
           ctx.spawnShockwave(
@@ -197,6 +197,10 @@ export const rimuruUltimateHandler: UltimateHandler = {
 
       // 4. Climax (2.7s): IMAGINARY COLLAPSE (TURN NULL!!) Supreme Void Annihilation Beam!
       if (state.elapsed >= 2.7) {
+        if (nearest) {
+          data.coneAngle = Math.atan2(nearest.y - owner.y, nearest.x - owner.x);
+          owner.facingAngle = data.coneAngle;
+        }
         data.beamFired = true;
         data.beamTimer = 0.95;
         data.beamX1 = owner.x;
@@ -232,14 +236,14 @@ export const rimuruUltimateHandler: UltimateHandler = {
           const ry = e.y - data.beamY1;
           const along = rx * dxL + ry * dyL;
           const perp = Math.abs(-rx * dyL + ry * dxL);
-          if (along >= -e.radius && perp <= e.radius + 54) {
+          if (along >= -e.radius && perp <= e.radius + 74) {
             e.shieldTimer = 0;
             e.armorShredTimer = Math.max(e.armorShredTimer, 3.2);
             e.antiHealTimer = Math.max(e.antiHealTimer, 2.2);
             ctx.applyDamage(
               owner,
               e,
-              ctx.getEffectiveDamage(owner, 26.0 * devourMult),
+              ctx.getEffectiveDamage(owner, 31.0 * devourMult),
               dxL * 560,
               dyL * 560,
               { isCrit: true, sourceKind: 'ability' },
