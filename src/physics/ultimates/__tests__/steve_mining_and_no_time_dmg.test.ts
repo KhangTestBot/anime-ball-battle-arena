@@ -68,14 +68,15 @@ describe('Steve Mining Progression & No Time-Based DMG% Scaling', () => {
 
     expect(steve.formIndex).toBe(0);
     expect(steve.character.forms[0].name).toBe('Wood Gear');
+    steve.hp = 2500; // Start at half HP to confirm upgrading armor does NOT heal Steve!
 
-    // Step until Steve spawns & mines all 15 ores (5 Iron, 5 Diamond, 5 Ancient Debris)
+    // Step until Steve spawns & mines all 30 ores (10 Iron, 10 Diamond, 10 Ancient Debris)
     let reachedIron = false;
     let reachedDiamond = false;
     let reachedNetherite = false;
     let damagedBeforeNetherite = false;
 
-    for (let i = 0; i < 7200 && !reachedNetherite; i++) {
+    for (let i = 0; i < 14000 && !reachedNetherite; i++) {
       engine.step(1 / 60);
       if (steve.formIndex < 3 && steve.damageDealt > 0) {
         damagedBeforeNetherite = true;
@@ -89,6 +90,7 @@ describe('Steve Mining Progression & No Time-Based DMG% Scaling', () => {
     expect(reachedIron).toBe(true);
     expect(reachedDiamond).toBe(true);
     expect(reachedNetherite).toBe(true);
+    expect(steve.hp).toBe(2500);
     expect(steve.character.forms[steve.formIndex].name).toBe('Full Netherite');
 
     // Once Full Netherite is crafted, Steve switches to combat mode and deals damage!

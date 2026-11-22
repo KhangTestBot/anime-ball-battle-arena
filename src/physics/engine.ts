@@ -1669,11 +1669,11 @@ export class BattleEngine implements AbilityContext {
             ? 'DIAMOND ORE'
             : 'ANCIENT DEBRIS';
 
-      if (f.steveMinedOres < 5) {
+      if (f.steveMinedOres < 10) {
         this.spawnFloatingText(
           ore.x,
           ore.y - 16,
-          `MINED ${oreLabel} (${f.steveMinedOres}/5)`,
+          `MINED ${oreLabel} (${f.steveMinedOres}/10)`,
           ore.color,
           'callout',
         );
@@ -1685,13 +1685,6 @@ export class BattleEngine implements AbilityContext {
         f.highestFormName = nextForm.name;
         f.invulnTimer = Math.max(f.invulnTimer, 0.5);
         f.powerUpFlashTimer = 0.8;
-
-        const rawHeal = Math.max(10, Math.round(f.maxHp * 0.16 * getHealMultiplier(f)));
-        const actualHeal = Math.min(f.maxHp - f.hp, rawHeal);
-        if (actualHeal > 0) {
-          f.hp += actualHeal;
-          this.spawnFloatingText(f.x, f.y + f.radius + 14, `+${actualHeal} HP`, '#4ade80', 'heal');
-        }
 
         const isNetherite = nextIdx === f.character.forms.length - 1;
         const headline = isNetherite
