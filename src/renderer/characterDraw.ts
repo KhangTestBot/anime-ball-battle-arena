@@ -185,6 +185,28 @@ export function drawFighterBall(
   }
 
   if (f.alive || f.koFadeTimer > 0.15) {
+    // Gojo Satoru Always-On Passive Infinity (Mugen) shimmering spatial barrier!
+    if (f.alive && f.character.id === 'gojo' && f.silenceTimer <= 0) {
+      const pulse = 0.72 + Math.sin(timeSec * 5.2) * 0.28;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.72)';
+      ctx.lineWidth = 2.4;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 12 * pulse;
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 9 + Math.sin(timeSec * 4) * 1.6, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(224, 242, 254, 0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 14, timeSec * 1.4, timeSec * 1.4 + Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
     // Active character-specific defensive shield barrier!
     if (f.alive && f.shieldTimer > 0) {
       drawCharacterShieldBarrier(ctx, f, form, r, timeSec);

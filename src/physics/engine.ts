@@ -891,6 +891,7 @@ export class BattleEngine implements AbilityContext {
         steveMinedOres: 0,
         steveMineSpawnCd: 0.25,
         sukunaSlashCd: 0.45,
+        gojoBasicCd: 0.55,
       };
     });
   }
@@ -1044,9 +1045,14 @@ export class BattleEngine implements AbilityContext {
         this.updateSteveMining(f, dt);
       }
 
-      // Sukuna ranged Dismantle basic attack (fights at range with cutting slashes instead of melee!)
+      // Sukuna ranged Dismantle basic attack (carves instant anime slash lines directly across foes!)
       if (f.character.id === 'sukuna' && f.stunTimer <= 0) {
         this.updateSukunaRangedBasic(f, dt);
+      }
+
+      // Gojo Satoru Always-On Passive Infinity (Mugen) + Blue-Infused Basic Attack!
+      if (f.character.id === 'gojo') {
+        this.updateGojoPassiveAndBasic(f, dt);
       }
 
       // League of Legends passive Gold income & automatic 6-slot Item Shop progression!
@@ -1332,54 +1338,120 @@ export class BattleEngine implements AbilityContext {
     if (!target) return;
 
     const form = this.getForm(f);
-    f.sukunaSlashCd = 0.68 * (form.cooldownMult ?? 1);
+    f.sukunaSlashCd = 0.66 * (form.cooldownMult ?? 1);
 
     const baseAng = Math.atan2(target.y - f.y, target.x - f.x);
     f.facingAngle = baseAng;
-    const offsets = f.formIndex >= 2 ? [-0.1, 0.1] : [0];
+
+    // Canon JJK Dismantle: instant razor-sharp slash lines carving directly across the target from afar!
+    const slashCount = f.formIndex >= 2 ? 2 : 1;
     const perSlashDmg = this.getEffectiveDamage(
       f,
-      f.character.baseStats.damage * (f.formIndex >= 2 ? 0.58 : 0.78),
+      f.character.baseStats.damage * (slashCount === 2 ? 0.56 : 0.82),
     );
+    const baseCutAngle = (Math.random() - 0.5) * Math.PI * 0.7 + Math.PI * 0.25;
+    const halfLen = 62 + form.powerLevel * 8;
 
-    for (const off of offsets) {
-      const a = baseAng + off;
-      this.projectiles.push({
+    for (let i = 0; i < slashCount; i++) {
+      const cutAng = i === 0 ? baseCutAngle : baseCutAngle + Math.PI * 0.5;
+      const x1 = target.x - Math.cos(cutAng) * halfLen;
+      const y1 = target.y - Math.sin(cutAng) * halfLen;
+      const x2 = target.x + Math.cos(cutAng) * halfLen;
+      const y2 = target.y + Math.sin(cutAng) * halfLen;
+
+      this.slashes.push({
         id: this.nextId('sukuna_dismantle'),
         ownerUid: f.uid,
         ownerCharId: f.character.id,
         ownerSeries: f.character.series,
         teamId: f.teamId,
-        kind: 'sword-wave',
-        x: f.x + Math.cos(a) * (f.radius + 10),
-        y: f.y + Math.sin(a) * (f.radius + 10),
-        vx: Math.cos(a) * 820,
-        vy: Math.sin(a) * 820,
-        radius: 13,
-        damage: perSlashDmg,
-        knockback: 165,
+        x1,
+        y1,
+        x2,
+        y2,
         color: '#e11d48',
         secondaryColor: '#09090b',
-        angle: a,
-        life: 1.25,
-        maxLife: 1.25,
-        piercing: true,
-        hitCooldowns: {},
-        powerLevel: form.powerLevel,
+        coreColor: '#ffffff',
+        width: slashCount === 2 ? 6.5 : 5.5,
+        telegraphTimer: 0.055,
+        activeTimer: 0.08,
+        fadeTimer: 0.22,
+        maxFade: 0.22,
+        damage: perSlashDmg,
+        hasStruck: false,
       });
     }
     this.spawnParticles(
-      f.x + Math.cos(baseAng) * f.radius,
-      f.y + Math.sin(baseAng) * f.radius,
-      5,
+      f.x + Math.cos(baseAng) * (f.radius + 4),
+      f.y + Math.sin(baseAng) * (f.radius + 4),
+      4,
       '#ff1f5a',
-      60,
-      190,
+      50,
+      160,
       2,
-      4.5,
+      4,
       'spark',
     );
-    this.emitSfx({ type: 'slash', intensity: 0.65 });
+    this.emitSfx({ type: 'slash', intensity: 0.75 });
+  }
+
+  private updateGojoPassiveAndBasic(f: FighterState, dt: number): void {
+    // 1. Always-On Passive Infinity (Mugen): halts non-piercing enemy projectiles entering Gojo's space!
+    if (f.silenceTimer <= 0) {
+      const stopRadius = f.radius + 54;
+      for (let i = this.projectiles.length - 1; i >= 0; i--) {
+        const p = this.projectiles[i];
+        if (p.ownerUid === f.uid) continue;
+        if (f.teamId !== null && p.teamId === f.teamId) continue;
+        if (p.piercing) continue; // Piercing spatial attacks / beams can challenge Infinity
+        const dist = Math.hypot(p.x - f.x, p.y - f.y);
+        if (dist <= stopRadius + p.radius) {
+          this.projectiles.splice(i, 1);
+          this.spawnParticles(p.x, p.y, 7, '#38bdf8', 30, 130, 2, 4.5, 'spark');
+          this.spawnShockwave(
+            f.x,
+            f.y,
+            f.radius + 32,
+            '#38bdf8',
+            2.5,
+            f.character.id,
+            f.character.series,
+          );
+          this.emitSfx({ type: 'dodge', intensity: 0.6 });
+        }
+      }
+    }
+
+    // 2. Canon JJK Gojo Basic Attack: Blue-Infused Martial Arts & Spatial Pull!
+    if (f.stunTimer > 0) return;
+    f.gojoBasicCd -= dt;
+    if (f.gojoBasicCd > 0) return;
+
+    const target = this.getNearestEnemy(f);
+    if (!target) return;
+    const dx = target.x - f.x;
+    const dy = target.y - f.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 250) return;
+
+    const form = this.getForm(f);
+    f.gojoBasicCd = 0.76 * (form.cooldownMult ?? 1);
+    const ang = Math.atan2(dy, dx);
+    f.facingAngle = ang;
+
+    // Blue gravitational snap pulls the opponent inward slightly while dealing a Blue-infused strike!
+    const pullForce = dist > 95 ? -210 : 185;
+    this.applyDamage(
+      f,
+      target,
+      this.getEffectiveDamage(f, f.character.baseStats.damage * 0.76),
+      Math.cos(ang) * pullForce,
+      Math.sin(ang) * pullForce,
+      { sourceKind: 'ability', isCrit: form.powerLevel >= 4 },
+    );
+    this.spawnShockwave(target.x, target.y, 58, '#38bdf8', 3.5, f.character.id, f.character.series);
+    this.spawnParticles(target.x, target.y, 9, '#38bdf8', 60, 210, 2.2, 4.8, 'spark');
+    this.emitSfx({ type: 'hit', intensity: 0.85 });
   }
 
   private updateSteveMining(f: FighterState, dt: number): void {
@@ -1717,6 +1789,20 @@ export class BattleEngine implements AbilityContext {
         }
 
         const isHeavyClash = speedDiff > 640;
+
+        // Gojo Always-On Infinity dampens normal melee bumps against him (unless attacker is in Ultimate/Domain)
+        const gojoInfA =
+          a.character.id === 'gojo' && a.silenceTimer <= 0 && !this.isUltimateActive(b);
+        const gojoInfB =
+          b.character.id === 'gojo' && b.silenceTimer <= 0 && !this.isUltimateActive(a);
+        if (gojoInfB) {
+          rawA *= 0.25;
+          this.spawnParticles(mx, my, 7, '#38bdf8', 50, 170, 2, 4.5, 'spark');
+        }
+        if (gojoInfA) {
+          rawB *= 0.25;
+          this.spawnParticles(mx, my, 7, '#38bdf8', 50, 170, 2, 4.5, 'spark');
+        }
 
         // Steve (while mining) and Sukuna (ranged Dismantle fighter) do not deal melee collision damage!
         if (!this.isSteveMining(a) && a.character.id !== 'sukuna') {

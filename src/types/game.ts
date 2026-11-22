@@ -417,6 +417,8 @@ export interface FighterState {
   steveMineSpawnCd: number;
   /** Sukuna ranged Dismantle basic-attack cooldown */
   sukunaSlashCd: number;
+  /** Gojo Blue-infused basic-attack cooldown */
+  gojoBasicCd: number;
 }
 
 export type ProjectileKind =
