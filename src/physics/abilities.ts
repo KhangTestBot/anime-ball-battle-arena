@@ -1,3 +1,4 @@
+import { getRimuruSkillsForForm } from '../characters/rimuruSkills';
 import type {
   ActiveUltimateState,
   ArenaBounds,
@@ -2523,7 +2524,8 @@ function pickAndExecuteSkill(
   target: FighterState,
   form: FormConfig,
 ): void {
-  const skills = f.character.skills;
+  const skills =
+    f.character.id === 'rimuru' ? getRimuruSkillsForForm(f.formIndex) : f.character.skills;
   if (skills.length === 0) return;
 
   const hpRatio = f.hp / f.maxHp;

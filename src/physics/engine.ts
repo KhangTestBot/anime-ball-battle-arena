@@ -512,6 +512,11 @@ export class BattleEngine implements AbilityContext {
       if (isLolChampion(attacker.character)) {
         attacker.lolGold += opts?.sourceKind === 'dot' ? 16 : 52;
       }
+      // Rimuru harvests Souls / Magicules whenever landing hits (canon Harvest Festival -> True Dragon -> Ciel!)
+      if (attacker.character.id === 'rimuru') {
+        const soulGain = Math.max(4, (dmg / Math.max(100, target.maxHp)) * 220);
+        attacker.rimuruSouls += soulGain;
+      }
       this.addUltimateCharge(attacker, dmg * 0.14 * ultHpNorm * crowdHitScale);
       target.lastDamagedByUid = attacker.uid;
     }
@@ -982,6 +987,7 @@ export class BattleEngine implements AbilityContext {
         mahoragaWheelAngle: 0,
         mahoragaAdaptDmgAcc: 0,
         mahoragaWheelFlash: 0,
+        rimuruSouls: 0,
       };
     });
   }
@@ -1153,6 +1159,22 @@ export class BattleEngine implements AbilityContext {
         }
         if (f.mahoragaAdaptStacks >= 4 && f.stunTimer > 0) {
           f.stunTimer = Math.max(0, f.stunTimer - dt);
+        }
+      }
+
+      // Rimuru Passive Predator / Beelzebuth: devours nearby non-piercing enemy projectiles to harvest Souls!
+      if (f.character.id === 'rimuru' && f.silenceTimer <= 0) {
+        const devourR = f.radius + 36;
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+          const p = this.projectiles[i];
+          if (p.ownerUid === f.uid || p.piercing) continue;
+          if (f.teamId !== null && p.teamId === f.teamId) continue;
+          if (Math.hypot(p.x - f.x, p.y - f.y) <= devourR + p.radius) {
+            this.projectiles.splice(i, 1);
+            f.rimuruSouls += 24;
+            this.spawnParticles(p.x, p.y, 8, '#a855f7', 40, 140, 2.2, 4.5, 'circle');
+            this.emitSfx({ type: 'dodge', intensity: 0.7 });
+          }
         }
       }
 
@@ -1705,14 +1727,32 @@ export class BattleEngine implements AbilityContext {
     const trig = nextForm.trigger;
     if (!trig) return;
 
-    const hpTimeScale = Math.pow(Math.max(100, this.config.baseHp) / 200, 0.32);
-    const hpDmgScale = Math.pow(Math.max(100, this.config.baseHp) / 200, 0.85);
-    const crowdDmgScale = 1 + Math.max(0, this.fighters.length - 2) * 0.18;
-    const scaledTime = trig.timeSec * hpTimeScale;
-    const scaledDmg = trig.damageDealt * hpDmgScale * crowdDmgScale;
-    const hpRatio = f.hp / f.maxHp;
+    let shouldTransform = false;
+    if (f.character.id === 'rimuru') {
+      // Rimuru canon evolution conditions (NOT automatic on timer!):
+      // Form 1 (True Demon Lord): Harvest Festival — 100 Souls harvested via combat/devouring
+      // Form 2 (True Dragon): Veldora Release — 200 Souls (or >=145 Souls & HP < 55%)
+      // Form 3 (Ciel · Azathoth): Manas Awakening — 300 Souls (or >=235 Souls & HP < 40%)
+      const hpRatio = f.hp / f.maxHp;
+      if (nextIdx === 1) {
+        shouldTransform = f.rimuruSouls >= 100;
+      } else if (nextIdx === 2) {
+        shouldTransform = f.rimuruSouls >= 200 || (f.rimuruSouls >= 145 && hpRatio <= 0.55);
+      } else if (nextIdx === 3) {
+        shouldTransform = f.rimuruSouls >= 300 || (f.rimuruSouls >= 235 && hpRatio <= 0.4);
+      }
+    } else {
+      const hpTimeScale = Math.pow(Math.max(100, this.config.baseHp) / 200, 0.32);
+      const hpDmgScale = Math.pow(Math.max(100, this.config.baseHp) / 200, 0.85);
+      const crowdDmgScale = 1 + Math.max(0, this.fighters.length - 2) * 0.18;
+      const scaledTime = trig.timeSec * hpTimeScale;
+      const scaledDmg = trig.damageDealt * hpDmgScale * crowdDmgScale;
+      const hpRatio = f.hp / f.maxHp;
+      shouldTransform =
+        this.elapsed >= scaledTime || hpRatio <= trig.hpRatioBelow || f.damageDealt >= scaledDmg;
+    }
 
-    if (this.elapsed >= scaledTime || hpRatio <= trig.hpRatioBelow || f.damageDealt >= scaledDmg) {
+    if (shouldTransform) {
       f.formIndex = nextIdx;
       f.highestFormName = nextForm.name;
       f.transformAngryTimer = 3.4;
@@ -2038,6 +2078,9 @@ export class BattleEngine implements AbilityContext {
       if (isLolChampion(attributedKiller.character)) {
         attributedKiller.lolGold += 480;
         this.buyNextLolItem(attributedKiller, false);
+      }
+      if (attributedKiller.character.id === 'rimuru') {
+        attributedKiller.rimuruSouls += 75;
       }
       onFighterKill(this, attributedKiller, victim);
     }

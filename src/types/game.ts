@@ -424,6 +424,8 @@ export interface FighterState {
   mahoragaWheelAngle: number;
   mahoragaAdaptDmgAcc: number;
   mahoragaWheelFlash: number;
+  /** Rimuru canon Harvest Festival / Soul Devour evolution gauge (100 -> Demon Lord, 200 -> True Dragon, 300 -> Ciel Azathoth) */
+  rimuruSouls: number;
 }
 
 export type ProjectileKind =

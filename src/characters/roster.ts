@@ -1255,9 +1255,9 @@ const RAW_ROSTER: readonly RawCharacterConfig[] = [
     series: 'Tensei Slime',
     category: 'anime',
     abilityId: 'gluttony-vortex',
-    abilityName: 'Beelzebuth · Ciel · Azathoth',
+    abilityName: 'Predator · Harvest Festival · Azathoth',
     abilityDesc:
-      'Supreme Demon Lord Slime: Devours projectiles & enemies to gain permanent damage, summons Veldora Black Lightning, and fires Void God Azathoth beams.',
+      'Evolves strictly by harvesting Souls & devouring enemy projectiles (100 -> True Demon Lord, 200 -> True Dragon, 300 -> Ciel Azathoth), upgrading his ENTIRE canon TenSura skill kit with every form!',
     primaryColor: '#06b6d4',
     secondaryColor: '#facc15',
     skinColor: '#f8e0d2',
