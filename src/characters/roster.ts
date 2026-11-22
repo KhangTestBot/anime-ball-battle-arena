@@ -286,7 +286,7 @@ const RAW_ROSTER: readonly RawCharacterConfig[] = [
       mass: 1.18,
       armor: 0.16,
       radius: 30,
-      abilityCooldown: 2.45,
+      abilityCooldown: 1.75,
     },
     forms: [
       {

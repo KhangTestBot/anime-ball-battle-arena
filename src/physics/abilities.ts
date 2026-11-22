@@ -1805,17 +1805,20 @@ export function updateProjectiles(ctx: AbilityContext, dt: number): void {
         }
       }
 
-      // Homing Fox-Fire steering
+      // Homing steering (Six Eyes Gojo orbs steer fast up to 720 px/s!)
       if (p.homing) {
         const nearest = findNearestEnemyFromPos(ctx, p.ownerUid, p.teamId, p.x, p.y);
         if (nearest) {
+          const isGojoOrb = p.ownerCharId === 'gojo';
           const dir = normalize(nearest.x - p.x, nearest.y - p.y);
-          p.vx += dir.x * 780 * dt;
-          p.vy += dir.y * 780 * dt;
+          const steer = isGojoOrb ? 1550 : 780;
+          const cap = isGojoOrb ? 720 : 430;
+          p.vx += dir.x * steer * dt;
+          p.vy += dir.y * steer * dt;
           const spd = Math.hypot(p.vx, p.vy);
-          if (spd > 430) {
-            p.vx = (p.vx / spd) * 430;
-            p.vy = (p.vy / spd) * 430;
+          if (spd > cap) {
+            p.vx = (p.vx / spd) * cap;
+            p.vy = (p.vy / spd) * cap;
           }
         }
       }
@@ -3305,12 +3308,26 @@ export function executeSkillDef(
       const kind = skill.projectileKind ?? 'meteor';
       const isPurple = kind === 'purple';
       const isRocket = kind === 'rocket';
-      const radius = isPurple
-        ? 34 + form.powerLevel * 2.5
-        : isRocket
-          ? 16
-          : 24 + form.powerLevel * 2;
-      const speed = isPurple ? 330 : isRocket ? 520 : 370;
+      const isGojo = charId === 'gojo';
+      const radius =
+        (isPurple ? 34 + form.powerLevel * 2.5 : isRocket ? 16 : 24 + form.powerLevel * 2) +
+        (isGojo ? 6 : 0);
+      const speed = isGojo ? (isPurple ? 640 : 680) : isPurple ? 330 : isRocket ? 520 : 370;
+
+      // Six Eyes predictive lead-aiming for Gojo's Blue, Red & Hollow Purple!
+      let fireAngle = angle;
+      if (isGojo) {
+        const nearest = ctx.getNearestEnemy(f);
+        if (nearest) {
+          const d = Math.hypot(nearest.x - f.x, nearest.y - f.y);
+          const leadT = Math.min(0.42, d / speed);
+          fireAngle = Math.atan2(
+            nearest.y + nearest.vy * leadT - f.y,
+            nearest.x + nearest.vx * leadT - f.x,
+          );
+        }
+      }
+
       ctx.projectiles.push({
         id: ctx.nextId('proj'),
         ownerUid: f.uid,
@@ -3318,19 +3335,20 @@ export function executeSkillDef(
         skillMotif: motif,
         teamId: f.teamId,
         kind,
-        x: f.x + Math.cos(angle) * (f.radius + radius * 0.6),
-        y: f.y + Math.sin(angle) * (f.radius + radius * 0.6),
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        x: f.x + Math.cos(fireAngle) * (f.radius + radius * 0.6),
+        y: f.y + Math.sin(fireAngle) * (f.radius + radius * 0.6),
+        vx: Math.cos(fireAngle) * speed,
+        vy: Math.sin(fireAngle) * speed,
         radius,
         damage: ctx.getEffectiveDamage(f, (9.6 + form.powerLevel * 1.55) * pwr),
         knockback: 390,
         color,
         secondaryColor: f.character.secondaryColor,
-        angle,
+        angle: fireAngle,
         life: 2.3,
         maxLife: 2.3,
         piercing: isPurple,
+        homing: isGojo,
         explosiveRadius: isPurple ? undefined : 115 + form.powerLevel * 10,
         hitCooldowns: {},
         powerLevel: form.powerLevel + (isPurple ? 1 : 0),

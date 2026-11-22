@@ -1492,10 +1492,10 @@ export class BattleEngine implements AbilityContext {
     const dx = target.x - f.x;
     const dy = target.y - f.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 250) return;
+    if (dist > 290) return;
 
     const form = this.getForm(f);
-    f.gojoBasicCd = 0.76 * (form.cooldownMult ?? 1);
+    f.gojoBasicCd = 0.58 * (form.cooldownMult ?? 1);
     const ang = Math.atan2(dy, dx);
     f.facingAngle = ang;
 
