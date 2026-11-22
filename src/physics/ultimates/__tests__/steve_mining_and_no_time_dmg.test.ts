@@ -36,6 +36,28 @@ describe('Steve Mining Progression & No Time-Based DMG% Scaling', () => {
     expect(b.dmgBonusPct).toBe(0);
   });
 
+  it('does not increase dmgBonusPct on dealing/taking damage and deals zero wall-impact damage', () => {
+    const engine = makeDuel('luffy', 'goku', 5000);
+    const [a, b] = engine.fighters;
+    a.dmgBonusPct = 0;
+    b.dmgBonusPct = 0;
+
+    engine.applyDamage(a, b, 50, 0, 0, { sourceKind: 'collision' });
+    expect(a.dmgBonusPct).toBe(0);
+    expect(b.dmgBonusPct).toBe(0);
+
+    // High-speed wall slam & sudden death wall touch must deal zero wall damage!
+    const hpBeforeWall = b.hp;
+    engine.suddenDeathActive = true;
+    b.lastDamagedByUid = a.uid;
+    b.x = engine.bounds.right - b.radius + 5;
+    b.vx = 1200;
+    b.vy = 0;
+    a.stunTimer = 5;
+    engine.step(1 / 60);
+    expect(b.hp).toBe(hpBeforeWall);
+  });
+
   it('Steve mines Iron -> Diamond -> Ancient Debris to reach Full Netherite before attacking', () => {
     const engine = makeDuel('steve', 'goku', 5000);
     const [steve, goku] = engine.fighters;

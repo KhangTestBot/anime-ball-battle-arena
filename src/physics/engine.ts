@@ -431,7 +431,6 @@ export class BattleEngine implements AbilityContext {
     if (attacker) {
       attacker.damageDealt += dmg;
       attacker.hitsLanded += 1;
-      attacker.dmgBonusPct += (opts?.sourceKind === 'dot' ? 0.7 : 2.4) * crowdHitScale;
       if (isLolChampion(attacker.character)) {
         attacker.lolGold += opts?.sourceKind === 'dot' ? 16 : 52;
       }
@@ -443,9 +442,6 @@ export class BattleEngine implements AbilityContext {
       }
       target.lastDamagedByUid = attacker.uid;
     }
-    const egoBonus =
-      target.character.id === 'vegeta' && targetForm.visualVariant === 'ego' ? 2.4 : 1.0;
-    target.dmgBonusPct += (opts?.sourceKind === 'dot' ? 0.45 : 1.6) * crowdHitScale * egoBonus;
     if (target.spiritLockTimer <= 0) {
       target.ultimateCharge = Math.min(
         100,
@@ -1189,9 +1185,12 @@ export class BattleEngine implements AbilityContext {
           const dy = ore.y - f.y;
           const dist = Math.hypot(dx, dy);
           if (dist > 1) {
-            const pull = 280 * f.character.baseStats.speed;
-            f.vx += (dx / dist) * pull * dt;
-            f.vy += (dy / dist) * pull * dt;
+            const targetSpd = Math.max(260, Math.hypot(f.vx, f.vy));
+            const desiredVx = (dx / dist) * targetSpd;
+            const desiredVy = (dy / dist) * targetSpd;
+            const blend = Math.min(1, dt * 4.5);
+            f.vx += (desiredVx - f.vx) * blend;
+            f.vy += (desiredVy - f.vy) * blend;
           }
         }
         // Gently evade very close enemies while peacefully mining
@@ -1710,33 +1709,6 @@ export class BattleEngine implements AbilityContext {
 
     f.squashTimer = 0.11;
     f.squashAngle = wallNormalAngle;
-
-    // High-speed Wall Slam bonus damage (e.g., blasted by Saitama's Serious Punch!)
-    if (impactSpeed > 630 && f.lastDamagedByUid) {
-      const attacker = this.fighters.find((x) => x.uid === f.lastDamagedByUid) ?? null;
-      const hpPacing = Math.max(0.85, Math.pow(this.config.baseHp / 200, 0.42));
-      const slamDmg = Math.round((impactSpeed - 540) * 0.055 * hpPacing);
-      if (slamDmg >= 3) {
-        this.applyDamage(attacker, f, slamDmg, 0, 0, {
-          isCrit: slamDmg >= 10,
-          sourceKind: 'wall',
-          bypassInvuln: true,
-        });
-        this.spawnShockwave(f.x, f.y, 70, '#fb923c', 4);
-        this.spawnParticles(f.x, f.y, 12, '#fb923c', 80, 260, 2.5, 5.5, 'shard');
-        this.addScreenShake(8);
-        this.emitSfx({ type: 'crit', intensity: 1.0 });
-        return;
-      }
-    }
-
-    // Sudden Death crimson edge burn if touching shrinking wall
-    if (this.suddenDeathActive && !this.wallBurnCooldowns.has(f.uid)) {
-      this.wallBurnCooldowns.set(f.uid, 0.7);
-      const burnDmg = Math.max(3, Math.round(f.maxHp * 0.018));
-      this.applyDamage(null, f, burnDmg, 0, 0, { sourceKind: 'wall', bypassInvuln: true });
-      this.spawnParticles(f.x, f.y, 6, '#fb3765', 60, 170, 2, 4, 'spark');
-    }
 
     this.spawnParticles(f.x, f.y, 4, this.getForm(f).auraColor, 50, 150, 1.8, 3.5, 'spark');
     this.emitSfx({ type: 'wall', intensity: Math.min(1.1, impactSpeed / 400) });
