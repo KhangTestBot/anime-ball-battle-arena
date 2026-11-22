@@ -156,12 +156,28 @@ export class BattleEngine implements AbilityContext {
     return best;
   }
 
+  private isUltimateActive(f: FighterState): boolean {
+    return (
+      (this.activeCutIn !== null && this.activeCutIn.fighterUid === f.uid) ||
+      this.activeUltimates.some((u) => u.ownerUid === f.uid) ||
+      this.domains.some((d) => d.ownerUid === f.uid)
+    );
+  }
+
+  private addUltimateCharge(f: FighterState, amount: number): void {
+    if (amount <= 0) return;
+    if (f.spiritLockTimer > 0) return;
+    if (this.isUltimateActive(f)) return;
+    if (f.ultimateCooldown > 0) return;
+    f.ultimateCharge = Math.min(100, f.ultimateCharge + amount);
+  }
+
   public getEffectiveDamage(fighter: FighterState, rawBase: number): number {
     const form = this.getForm(fighter);
     const dmgScale = 1 + fighter.dmgBonusPct / 100;
-    // Smooth sub-linear pacing curve so 500–5000 HP boss fights feel massive yet brisk
-    const hpPacing = Math.max(0.85, Math.pow(this.config.baseHp / 200, 0.42));
-    return rawBase * form.damageMult * dmgScale * hpPacing;
+    // Calibrated empirically so default 1000 HP duels average ~60 seconds (~1 minute)
+    const hpPacing = Math.max(0.75, Math.pow(this.config.baseHp / 1000, 0.35));
+    return rawBase * form.damageMult * dmgScale * hpPacing * 1.22;
   }
 
   public addScreenShake(amount: number): void {
@@ -427,27 +443,17 @@ export class BattleEngine implements AbilityContext {
     target.damageTaken += dmg;
     target.hitFlashTimer = 0.14;
     const crowdHitScale = this.fighters.length >= 6 ? 0.58 : this.fighters.length >= 4 ? 0.78 : 1.0;
-    const ultHpNorm = Math.pow(200 / Math.max(100, this.config.baseHp), 0.72);
+    const ultHpNorm = Math.pow(1000 / Math.max(100, this.config.baseHp), 0.62);
     if (attacker) {
       attacker.damageDealt += dmg;
       attacker.hitsLanded += 1;
       if (isLolChampion(attacker.character)) {
         attacker.lolGold += opts?.sourceKind === 'dot' ? 16 : 52;
       }
-      if (attacker.spiritLockTimer <= 0) {
-        attacker.ultimateCharge = Math.min(
-          100,
-          attacker.ultimateCharge + dmg * 0.52 * ultHpNorm * crowdHitScale,
-        );
-      }
+      this.addUltimateCharge(attacker, dmg * 0.14 * ultHpNorm * crowdHitScale);
       target.lastDamagedByUid = attacker.uid;
     }
-    if (target.spiritLockTimer <= 0) {
-      target.ultimateCharge = Math.min(
-        100,
-        target.ultimateCharge + dmg * 0.78 * ultHpNorm * crowdHitScale,
-      );
-    }
+    this.addUltimateCharge(target, dmg * 0.2 * ultHpNorm * crowdHitScale);
 
     // Apply knockback weighted inversely by mass (Enchanted Netherite adds +35% mass!)
     const holdInPlace =
@@ -1029,8 +1035,8 @@ export class BattleEngine implements AbilityContext {
       const sdBoost = this.suddenDeathActive ? 2.0 : 1.0;
       if (f.ultimateCooldown > 0) {
         f.ultimateCooldown = Math.max(0, f.ultimateCooldown - dt);
-      } else if (f.spiritLockTimer <= 0 && !this.isSteveMining(f)) {
-        f.ultimateCharge = Math.min(100, f.ultimateCharge + dt * 2.8);
+      } else if (!this.isSteveMining(f)) {
+        this.addUltimateCharge(f, dt * 2.1);
       }
 
       // Steve Minecraft ore-mining progression (Wood -> Iron -> Diamond -> Full Netherite before fighting!)
@@ -1473,7 +1479,7 @@ export class BattleEngine implements AbilityContext {
           : `${nextForm.name.toUpperCase()} CRAFTED!`;
         if (isNetherite) {
           f.transformAngryTimer = 3.4;
-          f.ultimateCharge = Math.min(100, f.ultimateCharge + 40);
+          this.addUltimateCharge(f, 40);
         }
         this.spawnFloatingText(f.x, f.y - f.radius - 20, headline, nextForm.auraColor, 'powerup');
         this.spawnShockwave(
@@ -1515,7 +1521,7 @@ export class BattleEngine implements AbilityContext {
       f.invulnTimer = 0.4;
       f.powerUpFlashTimer = 0.75;
       f.dmgBonusPct += 8;
-      f.ultimateCharge = Math.min(100, f.ultimateCharge + 18);
+      this.addUltimateCharge(f, 14);
 
       // Restore a portion of Max HP on form evolution to extend exciting battles!
       const totalForms = f.character.forms.length;
@@ -1583,7 +1589,7 @@ export class BattleEngine implements AbilityContext {
     const form = this.getForm(f);
     f.ultimateCharge = 0;
     f.ultimatesUsed += 1;
-    f.ultimateCooldown = 7.5;
+    f.ultimateCooldown = 8.5;
     this.globalCutInCooldown = this.fighters.length >= 6 ? 2.4 : 0.9;
 
     this.activeCutIn = {
@@ -1816,7 +1822,7 @@ export class BattleEngine implements AbilityContext {
 
     if (attributedKiller && attributedKiller.uid !== victim.uid) {
       attributedKiller.kills += 1;
-      attributedKiller.ultimateCharge = Math.min(100, attributedKiller.ultimateCharge + 28);
+      this.addUltimateCharge(attributedKiller, 22);
       if (isLolChampion(attributedKiller.character)) {
         attributedKiller.lolGold += 480;
         this.buyNextLolItem(attributedKiller, false);
