@@ -415,6 +415,8 @@ export interface FighterState {
   /** Steve Minecraft mining progression: ores mined in current armor tier (upgrades Wood -> Iron -> Diamond -> Netherite) */
   steveMinedOres: number;
   steveMineSpawnCd: number;
+  /** Sukuna ranged Dismantle basic-attack cooldown */
+  sukunaSlashCd: number;
 }
 
 export type ProjectileKind =

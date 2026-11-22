@@ -36,6 +36,8 @@ export const sukunaUltimateHandler: UltimateHandler = {
   duration: 4.5,
 
   onCast(ctx, owner, state) {
+    owner.unstoppableTimer = Math.max(owner.unstoppableTimer, 3.8);
+    owner.dmgBonusPct += 20;
     const data: SukunaUltimateData = {
       slashCd: 0.14,
       slashesDone: 0,
@@ -113,7 +115,7 @@ export const sukunaUltimateHandler: UltimateHandler = {
             activeTimer: 0.08,
             fadeTimer: 0.22,
             maxFade: 0.22,
-            damage: ctx.getEffectiveDamage(owner, 2.5),
+            damage: ctx.getEffectiveDamage(owner, 3.6),
             hasStruck: false,
           });
         }

@@ -884,6 +884,7 @@ export class BattleEngine implements AbilityContext {
         lolShopFlashTimer: 0,
         steveMinedOres: 0,
         steveMineSpawnCd: 0.25,
+        sukunaSlashCd: 0.45,
       };
     });
   }
@@ -1035,6 +1036,11 @@ export class BattleEngine implements AbilityContext {
       // Steve Minecraft ore-mining progression (Wood -> Iron -> Diamond -> Full Netherite before fighting!)
       if (this.isSteveMining(f)) {
         this.updateSteveMining(f, dt);
+      }
+
+      // Sukuna ranged Dismantle basic attack (fights at range with cutting slashes instead of melee!)
+      if (f.character.id === 'sukuna' && f.stunTimer <= 0) {
+        this.updateSukunaRangedBasic(f, dt);
       }
 
       // League of Legends passive Gold income & automatic 6-slot Item Shop progression!
@@ -1205,6 +1211,29 @@ export class BattleEngine implements AbilityContext {
             f.vy += (edy / edist) * evadePull * dt;
           }
         }
+      } else if (f.character.id === 'sukuna') {
+        // Ranged kiting AI: Sukuna maintains mid-to-long distance to slice foes with Dismantle!
+        const nearest = this.getNearestEnemy(f);
+        if (nearest) {
+          const dx = nearest.x - f.x;
+          const dy = nearest.y - f.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 1) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const steerDir = f.confusedTimer > 0 ? -1 : 1;
+            if (dist < 185) {
+              // Back off + strafe laterally to stay at ranged slash distance
+              const push = 165 * f.character.baseStats.speed * steerDir;
+              f.vx += (-nx * push - ny * push * 0.55) * dt;
+              f.vy += (-ny * push + nx * push * 0.55) * dt;
+            } else if (dist > 265) {
+              const pull = 85 * f.character.baseStats.speed * steerDir;
+              f.vx += nx * pull * dt;
+              f.vy += ny * pull * dt;
+            }
+          }
+        }
       } else {
         const nearest = this.getNearestEnemy(f);
         if (nearest) {
@@ -1287,6 +1316,64 @@ export class BattleEngine implements AbilityContext {
 
   private isSteveMining(f: FighterState): boolean {
     return f.character.id === 'steve' && f.formIndex < f.character.forms.length - 1;
+  }
+
+  private updateSukunaRangedBasic(f: FighterState, dt: number): void {
+    f.sukunaSlashCd -= dt;
+    if (f.sukunaSlashCd > 0) return;
+
+    const target = this.getNearestEnemy(f);
+    if (!target) return;
+
+    const form = this.getForm(f);
+    f.sukunaSlashCd = 0.68 * (form.cooldownMult ?? 1);
+
+    const baseAng = Math.atan2(target.y - f.y, target.x - f.x);
+    f.facingAngle = baseAng;
+    const offsets = f.formIndex >= 2 ? [-0.1, 0.1] : [0];
+    const perSlashDmg = this.getEffectiveDamage(
+      f,
+      f.character.baseStats.damage * (f.formIndex >= 2 ? 0.58 : 0.78),
+    );
+
+    for (const off of offsets) {
+      const a = baseAng + off;
+      this.projectiles.push({
+        id: this.nextId('sukuna_dismantle'),
+        ownerUid: f.uid,
+        ownerCharId: f.character.id,
+        ownerSeries: f.character.series,
+        teamId: f.teamId,
+        kind: 'sword-wave',
+        x: f.x + Math.cos(a) * (f.radius + 10),
+        y: f.y + Math.sin(a) * (f.radius + 10),
+        vx: Math.cos(a) * 820,
+        vy: Math.sin(a) * 820,
+        radius: 13,
+        damage: perSlashDmg,
+        knockback: 165,
+        color: '#e11d48',
+        secondaryColor: '#09090b',
+        angle: a,
+        life: 1.25,
+        maxLife: 1.25,
+        piercing: true,
+        hitCooldowns: {},
+        powerLevel: form.powerLevel,
+      });
+    }
+    this.spawnParticles(
+      f.x + Math.cos(baseAng) * f.radius,
+      f.y + Math.sin(baseAng) * f.radius,
+      5,
+      '#ff1f5a',
+      60,
+      190,
+      2,
+      4.5,
+      'spark',
+    );
+    this.emitSfx({ type: 'slash', intensity: 0.65 });
   }
 
   private updateSteveMining(f: FighterState, dt: number): void {
@@ -1625,15 +1712,15 @@ export class BattleEngine implements AbilityContext {
 
         const isHeavyClash = speedDiff > 640;
 
-        // While Steve is mining for Netherite, he does not attack enemies on collision!
-        if (!this.isSteveMining(a)) {
+        // Steve (while mining) and Sukuna (ranged Dismantle fighter) do not deal melee collision damage!
+        if (!this.isSteveMining(a) && a.character.id !== 'sukuna') {
           this.applyDamage(a, b, rawA, nx * 165, ny * 165, {
             isCrit: isHeavyClash,
             sourceKind: 'collision',
             allowLifesteal: (this.getForm(a).lifestealRatio ?? 0) > 0,
           });
         }
-        if (b.alive && !this.isSteveMining(b)) {
+        if (b.alive && !this.isSteveMining(b) && b.character.id !== 'sukuna') {
           this.applyDamage(b, a, rawB, -nx * 165, -ny * 165, {
             isCrit: isHeavyClash,
             sourceKind: 'collision',
