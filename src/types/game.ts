@@ -419,6 +419,10 @@ export interface FighterState {
   sukunaSlashCd: number;
   /** Gojo Blue-infused basic-attack cooldown */
   gojoBasicCd: number;
+  /** Mahoraga passive Dharma Wheel Adaptation stacks (0..8), wheel angle & damage accumulator */
+  mahoragaAdaptStacks: number;
+  mahoragaWheelAngle: number;
+  mahoragaAdaptDmgAcc: number;
 }
 
 export type ProjectileKind =

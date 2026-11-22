@@ -434,14 +434,63 @@ export class BattleEngine implements AbilityContext {
       target.stunTimer > 0 && target.stunKind === 'frozen' && opts?.sourceKind !== 'dot'
         ? 1.32
         : 1.0;
+    // Mahoraga Passive Dharma Wheel Adaptation: permanently reduces incoming damage by 7% per wheel turn (up to 56%!)
+    const adaptMult =
+      target.character.id === 'mahoraga'
+        ? Math.max(0.44, 1 - target.mahoragaAdaptStacks * 0.07)
+        : 1.0;
     const reduced =
-      rawDamage * (1 - armor) * armorShredBonus * shieldMult * enchantMult * shatterBonus;
+      rawDamage *
+      (1 - armor) *
+      armorShredBonus *
+      shieldMult *
+      enchantMult *
+      shatterBonus *
+      adaptMult;
     const dmg = Math.max(1, Math.round(reduced));
 
     const minFloor = target.immortalTimer > 0 ? 1 : 0;
     target.hp = Math.max(minFloor, target.hp - dmg);
     target.damageTaken += dmg;
     target.hitFlashTimer = 0.14;
+
+    // Mahoraga Passive Dharma Wheel (*KLINK!*): every ~7% Max HP taken turns the wheel (+1 stack up to 8 + heal!)
+    if (
+      target.character.id === 'mahoraga' &&
+      target.alive &&
+      target.hp > 0 &&
+      target.mahoragaAdaptStacks < 8
+    ) {
+      target.mahoragaAdaptDmgAcc += dmg;
+      const threshold = Math.max(18, target.maxHp * 0.07);
+      while (target.mahoragaAdaptDmgAcc >= threshold && target.mahoragaAdaptStacks < 8) {
+        target.mahoragaAdaptDmgAcc -= threshold;
+        target.mahoragaAdaptStacks += 1;
+        target.mahoragaWheelAngle += Math.PI / 4;
+        const heal = Math.round(target.maxHp * 0.04 * getHealMultiplier(target));
+        if (heal > 0) {
+          target.hp = Math.min(target.maxHp, target.hp + heal);
+          this.spawnFloatingText(
+            target.x,
+            target.y + target.radius + 14,
+            `+${heal}`,
+            '#fde047',
+            'heal',
+          );
+        }
+        this.spawnShockwave(
+          target.x,
+          target.y,
+          target.radius + 54,
+          '#facc15',
+          4,
+          target.character.id,
+          target.character.series,
+        );
+        this.spawnParticles(target.x, target.y, 10, '#fef08a', 50, 170, 2.2, 4.8, 'star');
+        this.emitSfx({ type: 'dodge', intensity: 1.0 });
+      }
+    }
     const crowdHitScale = this.fighters.length >= 6 ? 0.58 : this.fighters.length >= 4 ? 0.78 : 1.0;
     const ultHpNorm = Math.pow(1000 / Math.max(100, this.config.baseHp), 0.62);
     if (attacker) {
@@ -892,6 +941,9 @@ export class BattleEngine implements AbilityContext {
         steveMineSpawnCd: 0.25,
         sukunaSlashCd: 0.45,
         gojoBasicCd: 0.55,
+        mahoragaAdaptStacks: 0,
+        mahoragaWheelAngle: 0,
+        mahoragaAdaptDmgAcc: 0,
       };
     });
   }
@@ -1053,6 +1105,14 @@ export class BattleEngine implements AbilityContext {
       // Gojo Satoru Always-On Passive Infinity (Mugen) + Blue-Infused Basic Attack!
       if (f.character.id === 'gojo') {
         this.updateGojoPassiveAndBasic(f, dt);
+      }
+
+      // Mahoraga Passive Dharma Wheel gentle rotation + faster stun recovery when adapted (4+ stacks)
+      if (f.character.id === 'mahoraga') {
+        f.mahoragaWheelAngle += dt * (0.45 + f.mahoragaAdaptStacks * 0.18);
+        if (f.mahoragaAdaptStacks >= 4 && f.stunTimer > 0) {
+          f.stunTimer = Math.max(0, f.stunTimer - dt);
+        }
       }
 
       // League of Legends passive Gold income & automatic 6-slot Item Shop progression!

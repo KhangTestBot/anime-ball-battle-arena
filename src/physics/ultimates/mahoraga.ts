@@ -1,228 +1,167 @@
-import { getHealMultiplier } from '../domains';
 import type { UltimateHandler } from './types';
 
 export interface MahoragaUltimateData {
-  wheelAngle: number;
-  adaptTurns: number;
-  turnCd: number;
-  lastHp: number;
-  worldSlashFired: boolean;
-  slashX1: number;
-  slashY1: number;
-  slashX2: number;
-  slashY2: number;
-  slashFlash: number;
+  slamsDone: number;
+  slamCd: number;
+  obliterationFired: boolean;
+  pillarX: number;
+  pillarY: number;
+  pillarFlash: number;
 }
 
 export const mahoragaUltimateHandler: UltimateHandler = {
   characterId: 'mahoraga',
-  title: 'EIGHT-HANDLED SWORD DIVERGENT SILA: WHEEL OF ADAPTATION',
+  title: 'SWORD OF EXTERMINATION: DIVINE GENERAL RAMPAGE!!',
   subtitle:
-    'Spins the 8-Spoke Dharma Wheel (*KLINK!*): Unstoppable + Absorbs projectiles & adapts to damage to LEVEL UP & heal → Unleashes World-Cutting Slash piercing invulnerability, shields & obstacles!',
+    'Ascends into a Towering Titan (Giant + Unstoppable), executes 3 Sword of Extermination leap-slams, and drives a Positive Energy Cross-Pillar shattering shields & obstacles!',
   bannerColor: '#eab308',
-  castDuration: 0.25,
+  castDuration: 0.24,
   duration: 4.0,
 
   onCast(ctx, owner, state) {
-    owner.unstoppableTimer = Math.max(owner.unstoppableTimer, 3.2);
-    owner.enchantArmorTimer = Math.max(owner.enchantArmorTimer, 3.4);
-
-    const healAmt = owner.maxHp * 0.08 * getHealMultiplier(owner);
-    if (healAmt > 0.5) {
-      owner.hp = Math.min(owner.maxHp, owner.hp + healAmt);
-      ctx.spawnFloatingText(
-        owner.x,
-        owner.y - owner.radius - 14,
-        `+${Math.round(healAmt)} ADAPT REGEN`,
-        '#fde047',
-        'heal',
-      );
-    }
-
-    const target = ctx.getNearestEnemy(owner);
-    const ang = target ? Math.atan2(target.y - owner.y, target.x - owner.x) : owner.facingAngle;
+    owner.giantTimer = Math.max(owner.giantTimer, 3.8);
+    owner.unstoppableTimer = Math.max(owner.unstoppableTimer, 3.8);
+    owner.dmgBonusPct += 18;
 
     const data: MahoragaUltimateData = {
-      wheelAngle: 0,
-      adaptTurns: 1,
-      turnCd: 0.65,
-      lastHp: owner.hp,
-      worldSlashFired: false,
-      slashX1: owner.x,
-      slashY1: owner.y,
-      slashX2: owner.x + Math.cos(ang) * 900,
-      slashY2: owner.y + Math.sin(ang) * 900,
-      slashFlash: 0,
+      slamsDone: 0,
+      slamCd: 0.34,
+      obliterationFired: false,
+      pillarX: owner.x,
+      pillarY: owner.y,
+      pillarFlash: 0,
     };
     state.data = data as unknown as Record<string, unknown>;
 
-    ctx.spawnCastSeal(owner, owner.x, owner.y, ang, '#eab308', 'ULT', true);
+    ctx.spawnCastSeal(owner, owner.x, owner.y, owner.facingAngle, '#eab308', 'ULT', true);
     ctx.spawnShockwave(
       owner.x,
       owner.y,
-      210,
-      '#facc15',
-      7,
+      230,
+      '#fef08a',
+      8,
       owner.character.id,
       owner.character.series,
     );
-    ctx.spawnFloatingText(
-      owner.x,
-      owner.y - owner.radius - 24,
-      '*KLINK!* ADAPTATION BEGINS!',
-      '#fef08a',
-      'powerup',
-    );
-    ctx.spawnParticles(owner.x, owner.y, 24, '#facc15', 75, 250, 3, 6, 'star');
-    ctx.addScreenShake(10);
-    ctx.addHitstop(0.055);
-    ctx.emitSfx({ type: 'powerup' });
+    ctx.spawnParticles(owner.x, owner.y, 26, '#facc15', 80, 260, 3, 6.5, 'star');
+    ctx.addScreenShake(12);
+    ctx.addHitstop(0.06);
+    ctx.emitSfx({ type: 'powerup', intensity: 1.35 });
   },
 
   onTick(ctx, owner, state, dt) {
     const data = state.data as unknown as MahoragaUltimateData;
     const enemies = ctx.getEnemies(owner);
+    if (data.pillarFlash > 0) data.pillarFlash = Math.max(0, data.pillarFlash - dt);
 
-    data.wheelAngle += dt * (2.6 + data.adaptTurns * 0.65);
-    if (data.slashFlash > 0) data.slashFlash = Math.max(0, data.slashFlash - dt);
+    // 1. Three Sword of Extermination Titan Leap-Slams!
+    if (!data.obliterationFired && data.slamsDone < 3) {
+      data.slamCd -= dt;
+      if (data.slamCd <= 0) {
+        data.slamCd = 0.5;
+        data.slamsDone += 1;
 
-    const triggerWheelTurn = (reason: string): void => {
-      if (data.adaptTurns >= 8) return;
-      data.adaptTurns++;
-      data.wheelAngle += Math.PI / 4;
-      owner.shieldTimer = Math.max(owner.shieldTimer, 1.0);
-      const heal = owner.maxHp * 0.03 * getHealMultiplier(owner);
-      if (heal > 0.5) {
-        owner.hp = Math.min(owner.maxHp, owner.hp + heal);
-      }
-      ctx.spawnShockwave(
-        owner.x,
-        owner.y,
-        130,
-        '#facc15',
-        4.5,
-        owner.character.id,
-        owner.character.series,
-      );
-      ctx.spawnFloatingText(
-        owner.x,
-        owner.y - owner.radius - 16,
-        `*KLINK!* ${reason} x${data.adaptTurns}`,
-        '#fef08a',
-        'callout',
-      );
-      ctx.emitSfx({ type: 'dodge', intensity: 1.05 });
-    };
+        const target = ctx.getNearestEnemy(owner);
+        if (target) {
+          const ang = Math.atan2(target.y - owner.y, target.x - owner.x);
+          const pad = owner.radius + 8;
+          owner.x = Math.max(
+            ctx.bounds.left + pad,
+            Math.min(
+              ctx.bounds.right - pad,
+              target.x - Math.cos(ang) * (owner.radius + target.radius + 8),
+            ),
+          );
+          owner.y = Math.max(
+            ctx.bounds.top + pad,
+            Math.min(
+              ctx.bounds.bottom - pad,
+              target.y - Math.sin(ang) * (owner.radius + target.radius + 8),
+            ),
+          );
+          owner.facingAngle = ang;
 
-    // 1. Adapt to incoming projectiles & damage taken during Dharma Wheel phase!
-    if (!data.worldSlashFired) {
-      for (let i = ctx.projectiles.length - 1; i >= 0; i--) {
-        const p = ctx.projectiles[i];
-        if (
-          p.ownerUid !== owner.uid &&
-          Math.hypot(p.x - owner.x, p.y - owner.y) <= owner.radius + 78
-        ) {
-          ctx.spawnParticles(p.x, p.y, 8, '#fde047', 45, 140, 2.5, 5, 'star');
-          ctx.projectiles.splice(i, 1);
-          triggerWheelTurn('ADAPTED');
+          const slamDmg = 10.5 + owner.mahoragaAdaptStacks * 1.1;
+          ctx.applyDamage(
+            owner,
+            target,
+            ctx.getEffectiveDamage(owner, slamDmg),
+            Math.cos(ang) * 380,
+            Math.sin(ang) * 380,
+            { isCrit: true, sourceKind: 'ability' },
+          );
+          ctx.spawnShockwave(
+            target.x,
+            target.y,
+            135,
+            '#facc15',
+            6,
+            owner.character.id,
+            owner.character.series,
+          );
+          ctx.spawnParticles(target.x, target.y, 14, '#fef08a', 70, 230, 2.5, 5.5, 'star');
+          ctx.addScreenShake(9);
+          ctx.emitSfx({ type: 'slash', intensity: 1.25 });
         }
-      }
-
-      if (owner.hp < data.lastHp - 4) {
-        triggerWheelTurn('ADAPTED');
-      }
-      data.lastHp = owner.hp;
-
-      data.turnCd -= dt;
-      if (data.turnCd <= 0) {
-        data.turnCd = 0.7;
-        triggerWheelTurn('WHEEL TURN');
       }
     }
 
-    // 2. Climax (2.15s): WORLD-CUTTING SLASH (Adapted Sword of Extermination!)
-    if (!data.worldSlashFired && state.elapsed >= 2.15) {
-      data.worldSlashFired = true;
-      data.slashFlash = 1.35;
+    // 2. Climax (2.1s): SWORD OF EXTERMINATION — POSITIVE ENERGY CROSS-PILLAR OBLITERATION!
+    if (!data.obliterationFired && state.elapsed >= 2.1) {
+      data.obliterationFired = true;
+      data.pillarFlash = 1.45;
+      data.pillarX = owner.x;
+      data.pillarY = owner.y;
 
-      const target = ctx.getNearestEnemy(owner);
-      const ang = target ? Math.atan2(target.y - owner.y, target.x - owner.x) : owner.facingAngle;
-      const lx = Math.cos(ang);
-      const ly = Math.sin(ang);
-
-      data.slashX1 = owner.x - lx * 140;
-      data.slashY1 = owner.y - ly * 140;
-      data.slashX2 = owner.x + lx * 950;
-      data.slashY2 = owner.y + ly * 950;
-
-      // Cleave ALL obstacles & hostile projectiles along the World-Cutting Slash corridor!
+      // Shatter all enemy obstacles & projectiles in the cross-pillar blast!
       for (let i = ctx.obstacles.length - 1; i >= 0; i--) {
         const obs = ctx.obstacles[i];
-        const px = obs.x - owner.x;
-        const py = obs.y - owner.y;
-        const proj = px * lx + py * ly;
-        const perp = Math.abs(px * ly - py * lx);
-        if (proj >= -40 && perp <= 68) {
+        if (
+          obs.kind === 'iron-ore' ||
+          obs.kind === 'diamond-ore' ||
+          obs.kind === 'ancient-debris'
+        ) {
+          continue;
+        }
+        if (obs.ownerUid !== owner.uid) {
           ctx.obstacles.splice(i, 1);
         }
       }
       for (let i = ctx.projectiles.length - 1; i >= 0; i--) {
-        const p = ctx.projectiles[i];
-        if (p.ownerUid === owner.uid) continue;
-        const px = p.x - owner.x;
-        const py = p.y - owner.y;
-        const proj = px * lx + py * ly;
-        const perp = Math.abs(px * ly - py * lx);
-        if (proj >= -40 && perp <= 68) {
+        if (ctx.projectiles[i].ownerUid !== owner.uid) {
           ctx.projectiles.splice(i, 1);
         }
       }
 
-      const slashDmg = 16.0 + data.adaptTurns * 2.1;
+      const climaxDmg = 22.0 + owner.mahoragaAdaptStacks * 2.0;
       for (const e of enemies) {
-        const px = e.x - owner.x;
-        const py = e.y - owner.y;
-        const proj = px * lx + py * ly;
-        const perp = Math.abs(px * ly - py * lx);
-        if (proj >= -e.radius - 40 && perp <= e.radius + 72) {
-          e.shieldTimer = 0;
-          e.evadeTimer = 0;
-          e.dodgeLockedTimer = Math.max(e.dodgeLockedTimer, 2.6);
-          e.armorShredTimer = Math.max(e.armorShredTimer, 3.2);
-          ctx.applyDamage(owner, e, ctx.getEffectiveDamage(owner, slashDmg), lx * 580, ly * 580, {
-            bypassInvuln: true,
-            isCrit: true,
-            sourceKind: 'ability',
-          });
-          ctx.spawnFloatingText(
-            e.x,
-            e.y - e.radius - 16,
-            'WORLD-CUTTING SLASH!!',
-            '#fef08a',
-            'crit',
-          );
-        }
+        e.shieldTimer = 0;
+        e.evadeTimer = 0;
+        e.armorShredTimer = Math.max(e.armorShredTimer, 3.5);
+        const ang = Math.atan2(e.y - owner.y, e.x - owner.x);
+        ctx.applyDamage(
+          owner,
+          e,
+          ctx.getEffectiveDamage(owner, climaxDmg),
+          Math.cos(ang) * 680,
+          Math.sin(ang) * 680,
+          { bypassInvuln: true, isCrit: true, sourceKind: 'ability' },
+        );
       }
 
       ctx.addHitstop(0.09);
-      ctx.addScreenShake(24);
+      ctx.addScreenShake(22);
       ctx.spawnShockwave(
         owner.x,
         owner.y,
-        260,
-        '#facc15',
-        9,
+        360,
+        '#fef08a',
+        12,
         owner.character.id,
         owner.character.series,
       );
-      ctx.spawnFloatingText(
-        owner.x,
-        owner.y - owner.radius - 24,
-        'ADAPTATION COMPLETE · WORLD SLASH!!',
-        '#fef08a',
-        'powerup',
-      );
-      ctx.emitSfx({ type: 'slash', intensity: 1.5 });
+      ctx.spawnParticles(owner.x, owner.y, 34, '#facc15', 100, 340, 3, 7, 'star');
+      ctx.emitSfx({ type: 'ko', intensity: 1.5 });
     }
   },
 };

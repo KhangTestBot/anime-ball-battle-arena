@@ -207,6 +207,41 @@ export function drawFighterBall(
       ctx.restore();
     }
 
+    // Mahoraga Always-On Passive 8-Handled Golden Dharma Wheel (lights up per adaptation stack 0..8!)
+    if (f.alive && f.character.id === 'mahoraga') {
+      const stacks = f.mahoragaAdaptStacks ?? 0;
+      const wheelR = r + 15;
+      ctx.save();
+      ctx.rotate(f.mahoragaWheelAngle ?? timeSec * 0.5);
+      ctx.strokeStyle = stacks >= 8 ? '#fef08a' : '#eab308';
+      ctx.shadowColor = '#facc15';
+      ctx.shadowBlur = stacks > 0 ? 10 + stacks * 1.5 : 6;
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, wheelR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI * 2) / 8;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * (wheelR - 5), Math.sin(a) * (wheelR - 5));
+        ctx.lineTo(Math.cos(a) * (wheelR + 6), Math.sin(a) * (wheelR + 6));
+        ctx.stroke();
+
+        ctx.fillStyle = i < stacks ? '#fef08a' : 'rgba(202, 138, 4, 0.55)';
+        ctx.beginPath();
+        ctx.arc(
+          Math.cos(a) * (wheelR + 7),
+          Math.sin(a) * (wheelR + 7),
+          i < stacks ? 3.8 : 2.6,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // Active character-specific defensive shield barrier!
     if (f.alive && f.shieldTimer > 0) {
       drawCharacterShieldBarrier(ctx, f, form, r, timeSec);

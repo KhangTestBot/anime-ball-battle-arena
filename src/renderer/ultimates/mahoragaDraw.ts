@@ -4,69 +4,55 @@ import type { UltimateRenderer } from './types';
 export const mahoragaUltimateRenderer: UltimateRenderer = {
   characterId: 'mahoraga',
 
-  drawBackdrop(ctx, state, _bounds, fighters, _t) {
-    const data = state.data as unknown as MahoragaUltimateData;
+  drawBackdrop(ctx, state, bounds, fighters, t) {
     const owner = fighters.find((f) => f.uid === state.ownerUid && f.alive);
-    if (!owner) return;
-
-    // Giant Ornate 8-Handled Golden Dharma Wheel spinning behind Mahoraga!
+    const alpha = Math.min(1, state.elapsed / 0.22, (state.duration - state.elapsed) / 0.45);
     ctx.save();
-    ctx.translate(owner.x, owner.y);
-    ctx.rotate(data.wheelAngle);
+    ctx.globalAlpha = Math.max(0, alpha * 0.34);
+    ctx.fillStyle = '#291c04';
+    ctx.fillRect(0, 0, bounds.fullSize, bounds.fullSize);
 
-    const wheelR = owner.radius + 34;
-    ctx.strokeStyle = '#eab308';
-    ctx.shadowColor = '#facc15';
-    ctx.shadowBlur = 18;
-    ctx.lineWidth = 4.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, wheelR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.arc(0, 0, wheelR * 0.42, 0, Math.PI * 2);
-    ctx.stroke();
-
-    for (let i = 0; i < 8; i++) {
-      const a = (i * Math.PI * 2) / 8;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * wheelR * 0.42, Math.sin(a) * wheelR * 0.42);
-      ctx.lineTo(Math.cos(a) * (wheelR + 12), Math.sin(a) * (wheelR + 12));
-      ctx.stroke();
-
-      ctx.fillStyle = i < data.adaptTurns ? '#fef08a' : '#ca8a04';
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * (wheelR + 14), Math.sin(a) * (wheelR + 14), 5.2, 0, Math.PI * 2);
-      ctx.fill();
+    // Radiant Divine General Positive Energy blade halo around Giant Mahoraga!
+    if (owner) {
+      ctx.globalAlpha = Math.max(0, alpha * 0.85);
+      for (let i = 0; i < 4; i++) {
+        const ang = (i * Math.PI) / 2 + t * 2.2;
+        ctx.strokeStyle = i % 2 === 0 ? '#fef08a' : '#facc15';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(
+          owner.x + Math.cos(ang) * (owner.radius + 8),
+          owner.y + Math.sin(ang) * (owner.radius + 8),
+        );
+        ctx.lineTo(
+          owner.x + Math.cos(ang) * (owner.radius + 68),
+          owner.y + Math.sin(ang) * (owner.radius + 68),
+        );
+        ctx.stroke();
+      }
     }
     ctx.restore();
   },
 
-  drawForeground(ctx, state, _bounds, _fighters, _t) {
+  drawForeground(ctx, state, bounds) {
     const data = state.data as unknown as MahoragaUltimateData;
+    if (data.pillarFlash <= 0) return;
 
-    // Blinding White-Gold-Crimson World-Cutting Spatial Rift Slash!
-    if (data.slashFlash > 0) {
-      const p = Math.max(0, Math.min(1, data.slashFlash / 1.35));
-      ctx.save();
-      ctx.globalAlpha = p;
-      ctx.strokeStyle = '#facc15';
-      ctx.shadowColor = '#dc2626';
-      ctx.shadowBlur = 24;
-      ctx.lineWidth = 36 * p;
-      ctx.beginPath();
-      ctx.moveTo(data.slashX1, data.slashY1);
-      ctx.lineTo(data.slashX2, data.slashY2);
-      ctx.stroke();
+    // Colossal Golden-White Positive Energy Cross-Pillar Eruption across the entire arena!
+    const p = Math.max(0, Math.min(1, data.pillarFlash / 1.45));
+    const w = 54 * p;
+    ctx.save();
+    ctx.globalAlpha = p;
+    ctx.fillStyle = '#facc15';
+    ctx.shadowColor = '#fef08a';
+    ctx.shadowBlur = 32;
+    ctx.fillRect(data.pillarX - w * 0.5, 0, w, bounds.fullSize);
+    ctx.fillRect(0, data.pillarY - w * 0.5, bounds.fullSize, w);
 
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 12 * p;
-      ctx.beginPath();
-      ctx.moveTo(data.slashX1, data.slashY1);
-      ctx.lineTo(data.slashX2, data.slashY2);
-      ctx.stroke();
-      ctx.restore();
-    }
+    const core = 20 * p;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(data.pillarX - core * 0.5, 0, core, bounds.fullSize);
+    ctx.fillRect(0, data.pillarY - core * 0.5, bounds.fullSize, core);
+    ctx.restore();
   },
 };
