@@ -2590,20 +2590,28 @@ export function drawSlashes(ctx: CanvasRenderingContext2D, slashes: SlashEffect[
     const sec = sl.secondaryColor || '#ffffff';
     ctx.save();
     if (sl.telegraphTimer > 0) {
-      ctx.strokeStyle = hexWithAlpha(sl.color, 0.62);
-      ctx.lineWidth = dna.slashStyle === 'lol-skillshot' ? 2.6 : 1.6;
-      ctx.setLineDash(dna.slashStyle === 'minecraft-voxel' ? [6, 4] : [8, 6]);
-      ctx.beginPath();
-      ctx.moveTo(sl.x1, sl.y1);
-      ctx.lineTo(sl.x2, sl.y2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      if (sl.ownerCharId === 'sukuna') {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
+        ctx.shadowColor = '#ff1f5a';
+        ctx.shadowBlur = 8;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(sl.x1, sl.y1);
+        ctx.lineTo(sl.x2, sl.y2);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = hexWithAlpha(sl.color, 0.62);
+        ctx.lineWidth = dna.slashStyle === 'lol-skillshot' ? 2.6 : 1.6;
+        ctx.setLineDash(dna.slashStyle === 'minecraft-voxel' ? [6, 4] : [8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(sl.x1, sl.y1);
+        ctx.lineTo(sl.x2, sl.y2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     } else {
       const alpha = sl.activeTimer > 0 ? 1 : Math.max(0, sl.fadeTimer / Math.max(0.01, sl.maxFade));
       ctx.globalAlpha = alpha;
-      ctx.lineCap = dna.slashStyle === 'minecraft-voxel' ? 'square' : 'round';
-      ctx.shadowColor = sl.color;
-      ctx.shadowBlur = 16;
 
       const dx = sl.x2 - sl.x1;
       const dy = sl.y2 - sl.y1;
@@ -2612,6 +2620,53 @@ export function drawSlashes(ctx: CanvasRenderingContext2D, slashes: SlashEffect[
       const ny = dx / len;
       const mx = (sl.x1 + sl.x2) / 2;
       const my = (sl.y1 + sl.y2) / 2;
+
+      // Sukuna Canon Dismantle / Cleave: razor-sharp straight tapered needle-blade cut (NO zig-zag!)
+      if (sl.ownerCharId === 'sukuna') {
+        const outerW = Math.max(2.6, sl.width * 0.72 * alpha);
+        const midW = outerW * 0.56;
+        const coreW = Math.max(0.9, outerW * 0.28);
+
+        // 1. Crimson glowing razor diamond
+        ctx.shadowColor = '#ff1f5a';
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = '#e11d48';
+        ctx.beginPath();
+        ctx.moveTo(sl.x1, sl.y1);
+        ctx.lineTo(mx + nx * outerW, my + ny * outerW);
+        ctx.lineTo(sl.x2, sl.y2);
+        ctx.lineTo(mx - nx * outerW, my - ny * outerW);
+        ctx.closePath();
+        ctx.fill();
+
+        // 2. Pitch-black cursed edge
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#09090b';
+        ctx.beginPath();
+        ctx.moveTo(sl.x1, sl.y1);
+        ctx.lineTo(mx + nx * midW, my + ny * midW);
+        ctx.lineTo(sl.x2, sl.y2);
+        ctx.lineTo(mx - nx * midW, my - ny * midW);
+        ctx.closePath();
+        ctx.fill();
+
+        // 3. Blinding pure-white surgical hairline core
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(sl.x1, sl.y1);
+        ctx.lineTo(mx + nx * coreW, my + ny * coreW);
+        ctx.lineTo(sl.x2, sl.y2);
+        ctx.lineTo(mx - nx * coreW, my - ny * coreW);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+        continue;
+      }
+
+      ctx.lineCap = dna.slashStyle === 'minecraft-voxel' ? 'square' : 'round';
+      ctx.shadowColor = sl.color;
+      ctx.shadowBlur = 16;
 
       switch (dna.slashStyle) {
         case 'ukiyo-wave': {
