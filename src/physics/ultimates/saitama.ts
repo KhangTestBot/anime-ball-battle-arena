@@ -64,7 +64,7 @@ export const saitamaUltimateHandler: UltimateHandler = {
       e.vx += Math.cos(a) * 260;
       e.vy += Math.sin(a) * 260 - 140;
       e.confusedTimer = Math.max(e.confusedTimer, 0.75);
-      ctx.applyDamage(owner, e, ctx.getEffectiveDamage(owner, 6.5), 0, 0, {
+      ctx.applyDamage(owner, e, ctx.getEffectiveDamage(owner, 14.0), 0, 0, {
         sourceKind: 'ability',
       });
     }
@@ -73,7 +73,7 @@ export const saitamaUltimateHandler: UltimateHandler = {
       stage: 'table-flip',
       timer: 0.78,
       punchAngle: angle,
-      halfConeRad: (40 * Math.PI) / 180,
+      halfConeRad: (58 * Math.PI) / 180,
       rocks,
       punchFlash: 0,
       originX: owner.x,
@@ -139,6 +139,11 @@ export const saitamaUltimateHandler: UltimateHandler = {
       data.originY = owner.y;
       data.timer -= dt;
       if (data.timer <= 0) {
+        const lockTarget = ctx.getNearestEnemy(owner);
+        if (lockTarget) {
+          data.punchAngle = Math.atan2(lockTarget.y - owner.y, lockTarget.x - owner.x);
+          owner.facingAngle = data.punchAngle;
+        }
         data.stage = 'punched';
         data.punchFlash = 0.9;
 
@@ -192,18 +197,18 @@ export const saitamaUltimateHandler: UltimateHandler = {
           const dist = Math.hypot(dx, dy);
           const ang = Math.atan2(dy, dx);
           if (
-            dist <= 560 &&
-            (dist < owner.radius + e.radius + 18 ||
+            dist <= 680 &&
+            (dist < owner.radius + e.radius + 24 ||
               Math.abs(angleDiff(ang, data.punchAngle)) <= data.halfConeRad)
           ) {
             e.shieldTimer = 0;
-            e.armorShredTimer = Math.max(e.armorShredTimer, 3.5);
-            e.dodgeLockedTimer = Math.max(e.dodgeLockedTimer, 1.5);
+            e.armorShredTimer = Math.max(e.armorShredTimer, 4.0);
+            e.dodgeLockedTimer = Math.max(e.dodgeLockedTimer, 2.0);
 
             const pDirX = Math.cos(data.punchAngle);
             const pDirY = Math.sin(data.punchAngle);
-            const onePunchDmg = Math.max(ctx.getEffectiveDamage(owner, 95), e.maxHp * 0.85);
-            ctx.applyDamage(owner, e, onePunchDmg, pDirX * 1650, pDirY * 1650, {
+            const onePunchDmg = Math.max(ctx.getEffectiveDamage(owner, 145), e.maxHp * 0.98);
+            ctx.applyDamage(owner, e, onePunchDmg, pDirX * 1900, pDirY * 1900, {
               isCrit: true,
               sourceKind: 'ability',
             });
