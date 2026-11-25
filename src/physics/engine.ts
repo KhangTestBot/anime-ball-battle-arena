@@ -122,7 +122,7 @@ export class BattleEngine implements AbilityContext {
       fullSize,
     };
 
-    this.suddenDeathStartSec = Math.min(125, Math.round(22 + Math.pow(clampedHp, 0.56) * 0.85));
+    this.suddenDeathStartSec = 55;
     this.initFighters();
   }
 
