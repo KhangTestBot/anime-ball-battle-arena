@@ -76,6 +76,7 @@ export class BattleView {
   private stageEl: HTMLElement | null = null;
   private hudRoot: HTMLElement | null = null;
   private overlayRoot: HTMLElement | null = null;
+  private countdownEl: HTMLElement | null = null;
   private timerEl: HTMLElement | null = null;
   private sdBadgeEl: HTMLElement | null = null;
   private pauseBtnEl: HTMLButtonElement | null = null;
@@ -96,6 +97,19 @@ export class BattleView {
 
   public getCanvas(): HTMLCanvasElement | null {
     return this.canvasEl;
+  }
+
+  public setCountdown(label: string | null): void {
+    if (!this.countdownEl) return;
+    if (!label) {
+      this.countdownEl.classList.add('is-hidden');
+      this.countdownEl.classList.remove('is-go');
+      this.countdownEl.innerHTML = '';
+      return;
+    }
+    this.countdownEl.classList.remove('is-hidden');
+    this.countdownEl.classList.toggle('is-go', label === 'FIGHT!');
+    this.countdownEl.innerHTML = `<span class="countdown-text">${label}</span>`;
   }
 
   public mount(
@@ -146,6 +160,7 @@ export class BattleView {
             <div class="hud-container" data-el="hud"></div>
             <div class="arena-wrap">
               <canvas class="arena-canvas" data-el="canvas"></canvas>
+              <div class="arena-countdown is-hidden" data-el="countdown" aria-live="assertive"></div>
             </div>
             <div class="vertical-footer">ANIME BALL BATTLE ARENA</div>
           </div>
@@ -158,6 +173,7 @@ export class BattleView {
     this.stageEl = this.container.querySelector<HTMLElement>('[data-el="stage"]');
     this.hudRoot = this.container.querySelector<HTMLElement>('[data-el="hud"]');
     this.overlayRoot = this.container.querySelector<HTMLElement>('[data-el="overlay"]');
+    this.countdownEl = this.container.querySelector<HTMLElement>('[data-el="countdown"]');
     this.timerEl = this.container.querySelector<HTMLElement>('[data-el="clock"]');
     this.sdBadgeEl = this.container.querySelector<HTMLElement>('[data-el="sd-badge"]');
     this.pauseBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="pause"]');

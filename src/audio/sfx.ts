@@ -669,6 +669,47 @@ export class SoundEngine {
     });
   }
 
+  public playCountdown(step: 3 | 2 | 1 | 'go'): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx || !this.masterGain) return;
+    const t = this.ctx.currentTime;
+    const ctx = this.ctx;
+    const out = this.masterGain;
+
+    if (step === 'go') {
+      // Energetic arcade FIGHT! double-tone fanfare hit
+      [587.33, 880, 1174.66].forEach((freq, i) => {
+        const start = t + i * 0.025;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.001, start);
+        gain.gain.linearRampToValueAtTime(0.24, start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.36);
+        osc.connect(gain);
+        gain.connect(out);
+        osc.start(start);
+        osc.stop(start + 0.38);
+      });
+      return;
+    }
+
+    const freq = step === 3 ? 440 : step === 2 ? 523.25 : 659.25;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.24, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    osc.connect(gain);
+    gain.connect(out);
+    osc.start(t);
+    osc.stop(t + 0.24);
+  }
+
   private playVictory(t: number): void {
     const ctx = this.ctx!;
     const out = this.masterGain!;

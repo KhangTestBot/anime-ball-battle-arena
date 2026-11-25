@@ -1192,6 +1192,7 @@ input:focus-visible {
 
 /* ==================== ARENA CANVAS ==================== */
 .arena-wrap {
+  position: relative;
   width: min(68dvh, 92vw, 620px);
   aspect-ratio: 1 / 1;
   display: flex;
@@ -1203,6 +1204,53 @@ input:focus-visible {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.arena-countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 15;
+  background: rgba(4, 7, 15, 0.28);
+}
+
+.arena-countdown.is-go {
+  background: transparent;
+}
+
+.arena-countdown.is-hidden {
+  display: none;
+}
+
+.countdown-text {
+  font-size: clamp(64px, 14vw, 116px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #f8fafc;
+  text-shadow:
+    0 4px 0 #09090b,
+    0 10px 28px rgba(0, 0, 0, 0.7);
+  animation: countdownPop 0.34s cubic-bezier(0.22, 1.28, 0.36, 1) forwards;
+}
+
+.arena-countdown.is-go .countdown-text {
+  font-size: clamp(50px, 11vw, 92px);
+  color: #facc15;
+}
+
+@keyframes countdownPop {
+  0% {
+    opacity: 0;
+    transform: scale(1.65);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* ==================== MODALS: PAUSE, SUMMARY, BRACKET ==================== */

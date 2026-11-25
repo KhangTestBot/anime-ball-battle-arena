@@ -34,6 +34,9 @@ export class AnimeBattleApp {
   private paused = false;
   private summaryShown = false;
   private renderTime = 0;
+  private countdownRemaining = 0;
+  private countdownGoTimer = 0;
+  private lastCountdownDigit = 0;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -210,6 +213,13 @@ export class AnimeBattleApp {
     this.renderer = new ArenaRenderer(canvas);
     this.renderer.render(this.engine, 0);
 
+    // Start every match with a 3-2-1 countdown before fighters engage
+    this.countdownRemaining = 2.7;
+    this.countdownGoTimer = 0;
+    this.lastCountdownDigit = 3;
+    this.battleView.setCountdown('3');
+    this.sfx.playCountdown(3);
+
     this.lastTimestamp = performance.now();
     this.rafId = requestAnimationFrame(this.loop);
   }
@@ -242,6 +252,30 @@ export class AnimeBattleApp {
     this.lastTimestamp = now;
 
     if (!this.paused) {
+      if (this.countdownRemaining > 0) {
+        this.countdownRemaining = Math.max(0, this.countdownRemaining - frameSec);
+        const digit = Math.ceil(this.countdownRemaining / 0.9);
+        if (digit > 0 && digit !== this.lastCountdownDigit) {
+          this.lastCountdownDigit = digit;
+          this.battleView.setCountdown(String(digit));
+          this.sfx.playCountdown(digit as 3 | 2 | 1);
+        } else if (this.countdownRemaining <= 0) {
+          this.lastCountdownDigit = 0;
+          this.countdownGoTimer = 0.55;
+          this.battleView.setCountdown('FIGHT!');
+          this.sfx.playCountdown('go');
+        }
+        this.renderer.render(this.engine, this.renderTime);
+        return;
+      }
+
+      if (this.countdownGoTimer > 0) {
+        this.countdownGoTimer = Math.max(0, this.countdownGoTimer - frameSec);
+        if (this.countdownGoTimer <= 0) {
+          this.battleView.setCountdown(null);
+        }
+      }
+
       if (this.engine.activeCutIn) {
         this.renderTime += frameSec;
         this.engine.step(frameSec);
