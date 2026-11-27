@@ -27,6 +27,7 @@ export class SoundEngine {
   public readonly voiceStore: RealVoiceStore;
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private recordDest: MediaStreamAudioDestinationNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private decodedVoices = new Map<string, AudioBuffer>();
   private activeVoiceSource: AudioBufferSourceNode | null = null;
@@ -127,11 +128,21 @@ export class SoundEngine {
       this.masterGain.connect(compressor);
       compressor.connect(this.ctx.destination);
 
+      if (typeof this.ctx.createMediaStreamDestination === 'function') {
+        this.recordDest = this.ctx.createMediaStreamDestination();
+        compressor.connect(this.recordDest);
+      }
+
       this.noiseBuffer = this.createNoiseBuffer(this.ctx);
     }
     if (this.ctx.state === 'suspended') {
       void this.ctx.resume();
     }
+  }
+
+  public getRecordingAudioStream(): MediaStream | null {
+    this.unlock();
+    return this.recordDest?.stream ?? null;
   }
 
   /** Play a character's real audio clip (used for Lobby preview & Ultimate Cut-Ins) */

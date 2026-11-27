@@ -189,6 +189,7 @@ export interface MatchConfig {
   arenaTheme?: ArenaThemeId;
   suddenDeath: boolean;
   verticalMode: boolean;
+  autoRecord?: boolean;
 }
 
 export interface Afterimage {

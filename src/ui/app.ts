@@ -1,5 +1,6 @@
 import { SoundEngine } from '../audio/sfx';
 import { BattleEngine } from '../physics/engine';
+import { BattleRecorder, type RecordedVideo } from '../recording/battleRecorder';
 import { ArenaRenderer } from '../renderer/canvas';
 import {
   createTournament,
@@ -37,6 +38,11 @@ export class AnimeBattleApp {
   private countdownRemaining = 0;
   private countdownGoTimer = 0;
   private lastCountdownDigit = 0;
+  private activeCountdownLabel: string | null = null;
+  private recorder = new BattleRecorder();
+  private lastRecordedVideo: RecordedVideo | null = null;
+  private postKoRecordTimer = 0;
+  private finalizingRecording = false;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -81,6 +87,13 @@ export class AnimeBattleApp {
         this.rematchCurrent();
       },
       onTogglePause: () => this.togglePause(),
+      onToggleRecord: () => {
+        this.sfx.unlock();
+        void this.toggleRecording();
+      },
+      onDownloadVideo: () => {
+        this.downloadLastVideo();
+      },
       onChangeSpeed: (speed) => {
         this.simSpeed = speed;
         this.lobby.syncSimSpeed(speed);
@@ -128,6 +141,9 @@ export class AnimeBattleApp {
 
   private showLobby(): void {
     this.stopLoop();
+    this.recorder.cancel();
+    BattleRecorder.revoke(this.lastRecordedVideo);
+    this.lastRecordedVideo = null;
     this.sfx.stopActiveVoice();
     this.screen = 'lobby';
     this.engine = null;
@@ -195,6 +211,11 @@ export class AnimeBattleApp {
 
   private launchBattle(config: MatchConfig, tournamentSubtitle?: string): void {
     this.stopLoop();
+    this.recorder.cancel();
+    BattleRecorder.revoke(this.lastRecordedVideo);
+    this.lastRecordedVideo = null;
+    this.postKoRecordTimer = 0;
+    this.finalizingRecording = false;
     this.sfx.stopActiveVoice();
     this.screen = 'battle';
     this.activeConfig = config;
@@ -217,11 +238,107 @@ export class AnimeBattleApp {
     this.countdownRemaining = 2.7;
     this.countdownGoTimer = 0;
     this.lastCountdownDigit = 3;
+    this.activeCountdownLabel = '3';
     this.battleView.setCountdown('3');
     this.sfx.playCountdown(3);
 
+    if (config.autoRecord) {
+      this.startRecording(true);
+    }
+
     this.lastTimestamp = performance.now();
     this.rafId = requestAnimationFrame(this.loop);
+  }
+
+  private startRecording(silentToast = false): boolean {
+    if (!this.engine || this.recorder.isRecording()) return false;
+    const canvas = this.battleView.getCanvas();
+    if (!canvas) return false;
+    if (!BattleRecorder.isSupported()) {
+      this.battleView.showRecordToast('Browser does not support canvas video recording.');
+      return false;
+    }
+
+    BattleRecorder.revoke(this.lastRecordedVideo);
+    this.lastRecordedVideo = null;
+    const audioStream = this.sfx.getRecordingAudioStream();
+    const ok = this.recorder.start(canvas, this.engine, audioStream, {
+      verticalMode: this.activeConfig?.verticalMode ?? false,
+      countdownLabel: this.activeCountdownLabel,
+    });
+    if (ok) {
+      this.battleView.setRecordingState(true, 0);
+      if (!silentToast) {
+        this.battleView.showRecordToast('Recording started — press Stop or R to save video');
+      }
+    } else {
+      this.battleView.showRecordToast('Could not start video recording.');
+    }
+    return ok;
+  }
+
+  private async toggleRecording(): Promise<void> {
+    if (this.screen !== 'battle' || !this.engine || this.finalizingRecording) return;
+    if (!this.recorder.isRecording()) {
+      this.startRecording(false);
+      return;
+    }
+
+    this.finalizingRecording = true;
+    const video = await this.recorder.stop();
+    this.finalizingRecording = false;
+    this.battleView.setRecordingState(false, 0);
+
+    if (video) {
+      BattleRecorder.revoke(this.lastRecordedVideo);
+      this.lastRecordedVideo = video;
+      BattleRecorder.triggerDownload(video);
+      this.battleView.showRecordToast(`Video saved: ${video.filename}`);
+    }
+  }
+
+  private downloadLastVideo(): void {
+    if (!this.lastRecordedVideo) return;
+    BattleRecorder.triggerDownload(this.lastRecordedVideo);
+    this.battleView.showRecordToast(`Downloading ${this.lastRecordedVideo.filename}`);
+  }
+
+  private async finishRecordingAndShowSummary(): Promise<void> {
+    if (this.finalizingRecording) return;
+    this.finalizingRecording = true;
+    const video = await this.recorder.stop();
+    this.finalizingRecording = false;
+    this.battleView.setRecordingState(false, 0);
+
+    if (video) {
+      BattleRecorder.revoke(this.lastRecordedVideo);
+      this.lastRecordedVideo = video;
+      BattleRecorder.triggerDownload(video);
+      this.battleView.showRecordToast(`Match video saved: ${video.filename}`);
+    }
+
+    if (this.screen === 'battle' && this.engine?.finished && this.engine.matchResult) {
+      this.presentMatchSummary();
+    }
+  }
+
+  private presentMatchSummary(): void {
+    if (!this.engine || !this.engine.matchResult || this.summaryShown) return;
+    this.summaryShown = true;
+    if (this.tournament) {
+      recordTournamentMatchResult(this.tournament, this.engine.matchResult);
+      this.battleView.showTournamentBracket(
+        this.tournament,
+        this.engine.matchResult,
+        this.lastRecordedVideo,
+      );
+    } else {
+      this.battleView.showMatchSummary(
+        this.engine.matchResult,
+        this.engine.fighters,
+        this.lastRecordedVideo,
+      );
+    }
   }
 
   private togglePause(): boolean {
@@ -257,21 +374,25 @@ export class AnimeBattleApp {
         const digit = Math.ceil(this.countdownRemaining / 0.9);
         if (digit > 0 && digit !== this.lastCountdownDigit) {
           this.lastCountdownDigit = digit;
-          this.battleView.setCountdown(String(digit));
+          this.activeCountdownLabel = String(digit);
+          this.battleView.setCountdown(this.activeCountdownLabel);
           this.sfx.playCountdown(digit as 3 | 2 | 1);
         } else if (this.countdownRemaining <= 0) {
           this.lastCountdownDigit = 0;
           this.countdownGoTimer = 0.55;
+          this.activeCountdownLabel = 'FIGHT!';
           this.battleView.setCountdown('FIGHT!');
           this.sfx.playCountdown('go');
         }
         this.renderer.render(this.engine, this.renderTime);
+        this.captureRecordingFrame();
         return;
       }
 
       if (this.countdownGoTimer > 0) {
         this.countdownGoTimer = Math.max(0, this.countdownGoTimer - frameSec);
         if (this.countdownGoTimer <= 0) {
+          this.activeCountdownLabel = null;
           this.battleView.setCountdown(null);
         }
       }
@@ -301,18 +422,31 @@ export class AnimeBattleApp {
       this.battleView.updateHud(this.engine);
 
       if (this.engine.finished && this.engine.matchResult && !this.summaryShown) {
-        this.summaryShown = true;
-        if (this.tournament) {
-          recordTournamentMatchResult(this.tournament, this.engine.matchResult);
-          this.battleView.showTournamentBracket(this.tournament, this.engine.matchResult);
-        } else {
-          this.battleView.showMatchSummary(this.engine.matchResult, this.engine.fighters);
+        if (this.recorder.isRecording()) {
+          this.postKoRecordTimer += frameSec;
+          if (this.postKoRecordTimer >= 1.15) {
+            void this.finishRecordingAndShowSummary();
+          }
+        } else if (!this.finalizingRecording) {
+          this.presentMatchSummary();
         }
       }
     }
 
     this.renderer.render(this.engine, this.renderTime);
+    this.captureRecordingFrame();
   };
+
+  private captureRecordingFrame(): void {
+    if (!this.recorder.isRecording() || !this.engine) return;
+    const canvas = this.battleView.getCanvas();
+    if (!canvas) return;
+    this.recorder.captureFrame(canvas, this.engine, {
+      verticalMode: this.activeConfig?.verticalMode ?? false,
+      countdownLabel: this.activeCountdownLabel,
+    });
+    this.battleView.setRecordingState(true, this.recorder.getElapsedSec());
+  }
 
   private bindKeyboardShortcuts(): void {
     window.addEventListener('keydown', (e) => {
@@ -320,6 +454,10 @@ export class AnimeBattleApp {
       if (e.code === 'Space' && this.screen === 'battle' && !this.summaryShown) {
         e.preventDefault();
         this.togglePause();
+      } else if (e.key.toLowerCase() === 'r' && this.screen === 'battle' && !this.summaryShown) {
+        e.preventDefault();
+        this.sfx.unlock();
+        void this.toggleRecording();
       } else if (e.key.toLowerCase() === 'm') {
         this.sfx.unlock();
         const muted = this.sfx.toggleMute();

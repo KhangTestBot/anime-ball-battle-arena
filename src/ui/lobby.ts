@@ -40,6 +40,7 @@ export interface LobbyState {
   arenaTheme: ArenaThemeId;
   suddenDeath: boolean;
   verticalMode: boolean;
+  autoRecord: boolean;
   muted: boolean;
   voiceMode: VoiceMode;
 }
@@ -119,6 +120,7 @@ export function createInitialLobbyState(muted: boolean, voiceMode: VoiceMode): L
     arenaTheme: 'cyber-grid',
     suddenDeath: true,
     verticalMode: false,
+    autoRecord: false,
     muted,
     voiceMode,
   };
@@ -482,6 +484,14 @@ export class LobbyView {
                   <div class="toggle-desc">Displays a short-video vertical frame alongside desktop view</div>
                 </div>
                 <input type="checkbox" data-toggle="verticalMode" ${s.verticalMode ? 'checked' : ''} />
+              </label>
+
+              <label class="toggle-row">
+                <div>
+                  <div class="toggle-title">Auto-Record Video</div>
+                  <div class="toggle-desc">Records the full battle (HUD + audio) and saves video at KO</div>
+                </div>
+                <input type="checkbox" data-toggle="autoRecord" ${s.autoRecord ? 'checked' : ''} />
               </label>
             </div>
 
@@ -865,6 +875,7 @@ export class LobbyView {
         const key = input.dataset.toggle;
         if (key === 'suddenDeath') this.state.suddenDeath = input.checked;
         if (key === 'verticalMode') this.state.verticalMode = input.checked;
+        if (key === 'autoRecord') this.state.autoRecord = input.checked;
       });
     });
 
@@ -944,6 +955,7 @@ export class LobbyView {
           arenaTheme: this.state.arenaTheme,
           suddenDeath: this.state.suddenDeath,
           verticalMode: this.state.verticalMode,
+          autoRecord: this.state.autoRecord,
         };
         this.callbacks.onStartMatch(
           config,

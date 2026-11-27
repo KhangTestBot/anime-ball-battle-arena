@@ -1253,6 +1253,62 @@ input:focus-visible {
   }
 }
 
+/* ==================== VIDEO RECORDER CONTROLS ==================== */
+.btn-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+}
+
+.btn-record.is-recording {
+  background: rgba(220, 38, 38, 0.2);
+  border-color: #ef4444;
+  color: #fecaca;
+}
+
+.btn-record.is-recording .rec-dot {
+  animation: recPulse 1s ease-in-out infinite;
+}
+
+@keyframes recPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.record-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+
+.record-toast.is-hidden {
+  display: none;
+}
+
 /* ==================== MODALS: PAUSE, SUMMARY, BRACKET ==================== */
 .overlay-host {
   position: fixed;

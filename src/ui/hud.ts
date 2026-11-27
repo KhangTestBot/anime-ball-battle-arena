@@ -2,6 +2,7 @@ import { getVoiceModeLabel } from '../audio/sfx';
 import { getCharacterById } from '../characters/roster';
 import type { BattleEngine } from '../physics/engine';
 import { getLolBuildForCharacter, getNextLolItem, isLolChampion } from '../physics/lolShop';
+import type { RecordedVideo } from '../recording/battleRecorder';
 import { getCharacterPortraitDataUrl } from '../renderer/characterDraw';
 import { getCurrentTournamentMatch, getTournamentRoundLabel } from '../tournament/bracket';
 import type {
@@ -16,6 +17,8 @@ export interface BattleViewCallbacks {
   onBackToLobby(): void;
   onRematch(): void;
   onTogglePause(): boolean;
+  onToggleRecord(): void;
+  onDownloadVideo(): void;
   onChangeSpeed(speed: SimSpeedOption): void;
   onToggleMute(): boolean;
   onCycleVoiceMode(): VoiceMode;
@@ -80,6 +83,10 @@ export class BattleView {
   private timerEl: HTMLElement | null = null;
   private sdBadgeEl: HTMLElement | null = null;
   private pauseBtnEl: HTMLButtonElement | null = null;
+  private recordBtnEl: HTMLButtonElement | null = null;
+  private recordLabelEl: HTMLElement | null = null;
+  private recordToastEl: HTMLElement | null = null;
+  private toastTimer: number | null = null;
   private muteBtnEl: HTMLButtonElement | null = null;
   private voiceBtnEl: HTMLButtonElement | null = null;
   private verticalBtnEl: HTMLButtonElement | null = null;
@@ -135,6 +142,9 @@ export class BattleView {
             <button type="button" class="btn btn-xs btn-ghost" data-action="back-lobby">← Lobby</button>
             <button type="button" class="btn btn-xs btn-ghost" data-action="pause">Pause</button>
             <button type="button" class="btn btn-xs btn-ghost" data-action="rematch">Rematch</button>
+            <button type="button" class="btn btn-xs btn-ghost btn-record" data-action="record" title="Record Battle Video (R)">
+              <span class="rec-dot"></span><span data-el="record-label">Rec</span>
+            </button>
           </div>
           <div class="toolbar-center">
             <span class="battle-clock" data-el="clock">00:00</span>
@@ -164,6 +174,7 @@ export class BattleView {
             </div>
             <div class="vertical-footer">ANIME BALL BATTLE ARENA</div>
           </div>
+          <div class="record-toast is-hidden" data-el="record-toast" role="status"></div>
           <div class="overlay-host" data-el="overlay"></div>
         </main>
       </div>
@@ -177,6 +188,9 @@ export class BattleView {
     this.timerEl = this.container.querySelector<HTMLElement>('[data-el="clock"]');
     this.sdBadgeEl = this.container.querySelector<HTMLElement>('[data-el="sd-badge"]');
     this.pauseBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="pause"]');
+    this.recordBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="record"]');
+    this.recordLabelEl = this.container.querySelector<HTMLElement>('[data-el="record-label"]');
+    this.recordToastEl = this.container.querySelector<HTMLElement>('[data-el="record-toast"]');
     this.muteBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="mute"]');
     this.voiceBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="voice"]');
     this.verticalBtnEl = this.container.querySelector<HTMLButtonElement>(
@@ -485,13 +499,42 @@ export class BattleView {
     }
   }
 
+  public setRecordingState(recording: boolean, elapsedSec = 0): void {
+    if (!this.recordBtnEl || !this.recordLabelEl) return;
+    this.recordBtnEl.classList.toggle('is-recording', recording);
+    this.recordLabelEl.textContent = recording ? `Stop ${formatClock(elapsedSec)}` : 'Rec';
+    if (this.verticalBtnEl) {
+      this.verticalBtnEl.disabled = recording;
+      this.verticalBtnEl.title = recording
+        ? 'Stop recording before changing aspect ratio'
+        : 'Toggle 9:16 Vertical Mode';
+    }
+  }
+
+  public showRecordToast(message: string): void {
+    if (!this.recordToastEl) return;
+    if (this.toastTimer !== null) {
+      window.clearTimeout(this.toastTimer);
+    }
+    this.recordToastEl.textContent = message;
+    this.recordToastEl.classList.remove('is-hidden');
+    this.toastTimer = window.setTimeout(() => {
+      this.recordToastEl?.classList.add('is-hidden');
+      this.toastTimer = null;
+    }, 3400);
+  }
+
   public clearOverlay(): void {
     if (this.overlayRoot) {
       this.overlayRoot.innerHTML = '';
     }
   }
 
-  public showMatchSummary(result: MatchResult, fighters?: FighterState[]): void {
+  public showMatchSummary(
+    result: MatchResult,
+    fighters?: FighterState[],
+    recordedVideo?: RecordedVideo | null,
+  ): void {
     if (!this.overlayRoot) return;
     const winnerSummary = result.fighters[0];
     const winnerChar = winnerSummary ? getCharacterById(winnerSummary.characterId) : null;
@@ -570,6 +613,11 @@ export class BattleView {
           </div>
 
           <div class="modal-actions">
+            ${
+              recordedVideo
+                ? `<button type="button" class="btn btn-accent" data-summary="download-video">Download Video (.${recordedVideo.ext.toUpperCase()})</button>`
+                : ''
+            }
             <button type="button" class="btn btn-primary" data-summary="rematch">Rematch</button>
             <button type="button" class="btn btn-secondary" data-summary="lobby">Back to Lobby</button>
           </div>
@@ -577,6 +625,11 @@ export class BattleView {
       </div>
     `;
 
+    this.overlayRoot
+      .querySelector('[data-summary="download-video"]')
+      ?.addEventListener('click', () => {
+        this.callbacks.onDownloadVideo();
+      });
     this.overlayRoot.querySelector('[data-summary="rematch"]')?.addEventListener('click', () => {
       this.callbacks.onRematch();
     });
@@ -585,7 +638,11 @@ export class BattleView {
     });
   }
 
-  public showTournamentBracket(tournament: TournamentState, lastResult: MatchResult | null): void {
+  public showTournamentBracket(
+    tournament: TournamentState,
+    lastResult: MatchResult | null,
+    recordedVideo?: RecordedVideo | null,
+  ): void {
     if (!this.overlayRoot) return;
     const nextMatch = getCurrentTournamentMatch(tournament);
     const totalRounds = tournament.rounds.length;
@@ -662,6 +719,11 @@ export class BattleView {
 
           <div class="modal-actions">
             ${
+              recordedVideo
+                ? `<button type="button" class="btn btn-accent" data-bracket="download-video">Download Video (.${recordedVideo.ext.toUpperCase()})</button>`
+                : ''
+            }
+            ${
               tournament.completed
                 ? `
                   <button type="button" class="btn btn-primary" data-bracket="restart">Restart Tournament</button>
@@ -677,6 +739,11 @@ export class BattleView {
       </div>
     `;
 
+    this.overlayRoot
+      .querySelector('[data-bracket="download-video"]')
+      ?.addEventListener('click', () => {
+        this.callbacks.onDownloadVideo();
+      });
     this.overlayRoot.querySelector('[data-bracket="next"]')?.addEventListener('click', () => {
       this.callbacks.onNextTournamentMatch();
     });
@@ -698,6 +765,9 @@ export class BattleView {
     });
     root.querySelector('[data-action="rematch"]')?.addEventListener('click', () => {
       this.callbacks.onRematch();
+    });
+    root.querySelector('[data-action="record"]')?.addEventListener('click', () => {
+      this.callbacks.onToggleRecord();
     });
     root.querySelector('[data-action="mute"]')?.addEventListener('click', () => {
       const muted = this.callbacks.onToggleMute();
