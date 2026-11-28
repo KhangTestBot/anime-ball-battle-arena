@@ -347,6 +347,7 @@ export class AnimeBattleApp {
     if (this.paused) {
       this.sfx.stopActiveVoice();
     }
+    this.recorder.setPaused(this.paused);
     this.battleView.setPaused(this.paused);
     if (!this.paused) {
       this.lastTimestamp = performance.now();
@@ -434,7 +435,9 @@ export class AnimeBattleApp {
     }
 
     this.renderer.render(this.engine, this.renderTime);
-    this.captureRecordingFrame();
+    if (!this.paused) {
+      this.captureRecordingFrame();
+    }
   };
 
   private captureRecordingFrame(): void {

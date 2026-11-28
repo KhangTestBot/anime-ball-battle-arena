@@ -87,6 +87,8 @@ export class BattleView {
   private recordLabelEl: HTMLElement | null = null;
   private recordToastEl: HTMLElement | null = null;
   private toastTimer: number | null = null;
+  private lastRecState = false;
+  private lastRecSec = -1;
   private muteBtnEl: HTMLButtonElement | null = null;
   private voiceBtnEl: HTMLButtonElement | null = null;
   private verticalBtnEl: HTMLButtonElement | null = null;
@@ -191,6 +193,8 @@ export class BattleView {
     this.recordBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="record"]');
     this.recordLabelEl = this.container.querySelector<HTMLElement>('[data-el="record-label"]');
     this.recordToastEl = this.container.querySelector<HTMLElement>('[data-el="record-toast"]');
+    this.lastRecState = false;
+    this.lastRecSec = -1;
     this.muteBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="mute"]');
     this.voiceBtnEl = this.container.querySelector<HTMLButtonElement>('[data-action="voice"]');
     this.verticalBtnEl = this.container.querySelector<HTMLButtonElement>(
@@ -501,6 +505,10 @@ export class BattleView {
 
   public setRecordingState(recording: boolean, elapsedSec = 0): void {
     if (!this.recordBtnEl || !this.recordLabelEl) return;
+    const sec = recording ? Math.floor(elapsedSec) : -1;
+    if (recording === this.lastRecState && sec === this.lastRecSec) return;
+    this.lastRecState = recording;
+    this.lastRecSec = sec;
     this.recordBtnEl.classList.toggle('is-recording', recording);
     this.recordLabelEl.textContent = recording ? `Stop ${formatClock(elapsedSec)}` : 'Rec';
     if (this.verticalBtnEl) {

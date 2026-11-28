@@ -131,6 +131,14 @@ export class SoundEngine {
       if (typeof this.ctx.createMediaStreamDestination === 'function') {
         this.recordDest = this.ctx.createMediaStreamDestination();
         compressor.connect(this.recordDest);
+        // Silent continuous keepalive signal so MediaRecorder never stalls video waiting on Web Audio timestamps
+        const keepaliveOsc = this.ctx.createOscillator();
+        const keepaliveGain = this.ctx.createGain();
+        keepaliveOsc.frequency.setValueAtTime(20, this.ctx.currentTime);
+        keepaliveGain.gain.setValueAtTime(0.00001, this.ctx.currentTime);
+        keepaliveOsc.connect(keepaliveGain);
+        keepaliveGain.connect(this.recordDest);
+        keepaliveOsc.start();
       }
 
       this.noiseBuffer = this.createNoiseBuffer(this.ctx);
